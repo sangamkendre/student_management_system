@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Student Management System{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <aside class="app-sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">🎓</div>
+        <div class="brand-text">
+          <h2>EduManage</h2>
+          <p>{{ user_role }} Portal</p>
+        </div>
+      </div>
+
+      <nav class="sidebar-menu">
+        {% if user_role == 'admin' %}
+          <div class="menu-category">Main Navigation</div>
+          <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>Dashboard</span>
+          </a>
+
+          <div class="menu-category">Management</div>
+          <a href="{{ url_for('admin.teachers') }}" class="nav-link {% if 'teachers' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Teachers</span>
+          </a>
+          <a href="{{ url_for('admin.courses') }}" class="nav-link {% if 'courses' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Courses</span>
+          </a>
+          <a href="{{ url_for('admin.batches') }}" class="nav-link {% if 'batches' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>Batches</span>
+          </a>
+          <a href="{{ url_for('admin.students') }}" class="nav-link {% if 'students' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>Students</span>
+          </a>
+          <a href="{{ url_for('admin.fees') }}" class="nav-link {% if 'fees' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            <span>Fees Management</span>
+          </a>
+
+          <div class="menu-category">Analytics</div>
+          <a href="{{ url_for('admin.reports') }}" class="nav-link {% if 'reports' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <span>Attendance Reports</span>
+          </a>
+
+        {% elif user_role == 'teacher' %}
+          <div class="menu-category">Instructor Menu</div>
+          <a href="{{ url_for('teacher.dashboard') }}" class="nav-link {% if request.endpoint == 'teacher.dashboard' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>Dashboard</span>
+          </a>
+          <a href="{{ url_for('teacher.batches') }}" class="nav-link {% if 'batches' in request.endpoint or 'session' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>My Batches</span>
+          </a>
+          <a href="{{ url_for('teacher.students') }}" class="nav-link {% if request.endpoint == 'teacher.students' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Students</span>
+          </a>
+
+          <a href="{{ url_for('teacher.profile') }}" class="nav-link {% if request.endpoint == 'teacher.profile' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>My Profile</span>
+          </a>
+
+        {% elif user_role == 'student' %}
+          <div class="menu-category">Student Menu</div>
+          <a href="{{ url_for('student.dashboard') }}" class="nav-link {% if request.endpoint == 'student.dashboard' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span>My Dashboard</span>
+          </a>
+          <a href="{{ url_for('student.batches') }}" class="nav-link {% if request.endpoint == 'student.batches' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Enrolled Batches</span>
+          </a>
+          <a href="{{ url_for('student.attendance_history') }}" class="nav-link {% if request.endpoint == 'student.attendance_history' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span>Attendance History</span>
+          </a>
+          <a href="{{ url_for('student.scan') }}" class="nav-link {% if request.endpoint == 'student.scan' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><rect x="7" y="7" width="3" height="3"></rect><rect x="14" y="7" width="3" height="3"></rect><rect x="7" y="14" width="3" height="3"></rect><rect x="14" y="14" width="3" height="3"></rect></svg>
+            <span>Scan QR Code</span>
+          </a>
+          <a href="{{ url_for('student.fees') }}" class="nav-link {% if 'fees' in request.endpoint %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            <span>Fees & Dues</span>
+          </a>
+          <a href="{{ url_for('student.profile') }}" class="nav-link {% if request.endpoint == 'student.profile' %}active{% endif %}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span>My Profile</span>
+          </a>
+        {% endif %}
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-profile-pill">
+          {% if user_role == 'teacher' %}
+            <a href="{{ url_for('teacher.profile') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; overflow: hidden;">
+              <div class="user-avatar">{{ user_name[0]|upper if user_name else 'U' }}</div>
+              <div class="user-info">
+                <div class="name" title="View Profile">{{ user_name }}</div>
+                <span class="role-badge {{ user_role }}">{{ user_role }}</span>
+              </div>
+            </a>
+          {% elif user_role == 'student' %}
+            <a href="{{ url_for('student.profile') }}" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; overflow: hidden;">
+              <div class="user-avatar">{{ user_name[0]|upper if user_name else 'U' }}</div>
+              <div class="user-info">
+                <div class="name" title="View Profile">{{ user_name }}</div>
+                <span class="role-badge {{ user_role }}">{{ user_role }}</span>
+              </div>
+            </a>
+          {% else %}
+            <div class="user-avatar">{{ user_name[0]|upper if user_name else 'U' }}</div>
+            <div class="user-info">
+              <div class="name">{{ user_name }}</div>
+              <span class="role-badge {{ user_role }}">{{ user_role }}</span>
+            </div>
+          {% endif %}
+          <a href="{{ url_for('auth.logout') }}" title="Sign Out" style="color: #94a3b8; margin-left: auto;">
+            <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+      <header class="app-topbar">
+        <div class="topbar-left">
+          <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+        </div>
+        <div class="topbar-right">
+          <span style="font-size: 13.5px; color: var(--text-muted);">Signed in as <strong style="color: var(--text-main);">{{ user_name }}</strong></span>
+          <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary btn-sm">
+            <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <span>Logout</span>
+          </a>
+        </div>
+      </header>
+
+      <div class="content-body">
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="alerts-container">
+              {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">
+                  <span>{{ message }}</span>
+                  <button type="button" onclick="this.parentElement.remove()" style="background:none; border:none; cursor:pointer; font-weight:bold; color:inherit;">&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+
+  <!-- Global Modal JS Helper -->
+  <script>
+    function openModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('open');
+    }
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('open');
+    }
+    window.addEventListener('click', function(e) {
+      if (e.target.classList.contains('modal-backdrop')) {
+        e.target.classList.remove('open');
+      }
+    });
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

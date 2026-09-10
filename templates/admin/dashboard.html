@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block page_title %}Admin Control Center{% endblock %}
+
+{% block content %}
+<!-- Metric KPI Cards -->
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="metric-icon indigo">👨‍🎓</div>
+    <div class="metric-details">
+      <div class="label">Total Students</div>
+      <div class="value">{{ total_students }}</div>
+      <div class="subtext">Active enrollees</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon emerald">👨‍🏫</div>
+    <div class="metric-details">
+      <div class="label">Total Teachers</div>
+      <div class="value">{{ total_teachers }}</div>
+      <div class="subtext">Faculty members</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon purple">👥</div>
+    <div class="metric-details">
+      <div class="label">Total Batches</div>
+      <div class="value">{{ total_batches }}</div>
+      <div class="subtext">Scheduled cohorts</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon amber">📚</div>
+    <div class="metric-details">
+      <div class="label">Total Courses</div>
+      <div class="value">{{ total_courses }}</div>
+      <div class="subtext">Available programs</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon sky">⚡</div>
+    <div class="metric-details">
+      <div class="label">Today's Attendance</div>
+      <div class="value">{{ today_present }}</div>
+      <div class="subtext">{{ today_sessions }} sessions today</div>
+    </div>
+  </div>
+
+  <div class="metric-card" onclick="window.location.href='{{ url_for('admin.fees') }}'" style="cursor: pointer;" title="Go to Fees Management">
+    <div class="metric-icon emerald">💰</div>
+    <div class="metric-details">
+      <div class="label">Fees Collected</div>
+      <div class="value amount-paid">₹{{ "{:,.0f}".format(fees_summary.total_collected or 0) }}</div>
+      <div class="subtext">₹{{ "{:,.0f}".format(fees_summary.total_remaining or 0) }} due &rarr;</div>
+    </div>
+  </div>
+</div>
+
+<!-- Two-Column Layout for Batches & Recent Sessions -->
+<div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px;">
+  
+  <!-- Active Batches Overview -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Active & Upcoming Batches</h3>
+      <a href="{{ url_for('admin.batches') }}" class="btn btn-secondary btn-sm">Manage Batches</a>
+    </div>
+    <div class="card-body" style="padding: 0;">
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Batch Name</th>
+              <th>Course</th>
+              <th>Teacher</th>
+              <th>Timings</th>
+              <th>Students</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for b in recent_batches %}
+              <tr>
+                <td><strong>{{ b.batch_name }}</strong></td>
+                <td>{{ b.course_name }}</td>
+                <td>{{ b.teacher_name or 'Unassigned' }}</td>
+                <td>
+                  <span style="font-size: 12px; color: var(--text-muted);">
+                    {{ b.start_time or 'TBD' }} - {{ b.end_time or 'TBD' }}
+                  </span>
+                </td>
+                <td><span class="status-pill upcoming">{{ b.student_count }} Students</span></td>
+                <td><span class="status-pill {{ b.status }}">{{ b.status }}</span></td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                  No batches configured yet. <a href="{{ url_for('admin.batches') }}">Create your first batch</a>.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Attendance Sessions -->
+  <div class="card">
+    <div class="card-header">
+      <h3>Recent Attendance Sessions</h3>
+      <a href="{{ url_for('admin.reports') }}" class="btn btn-secondary btn-sm">All Reports</a>
+    </div>
+    <div class="card-body" style="padding: 0;">
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Batch</th>
+              <th>Teacher</th>
+              <th>Presents</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in recent_sessions %}
+              <tr>
+                <td>{{ s.session_date }}</td>
+                <td><strong>{{ s.batch_name }}</strong></td>
+                <td>{{ s.teacher_name }}</td>
+                <td>
+                  <span class="status-pill present">{{ s.present_count }} Present</span>
+                </td>
+                <td><span class="status-pill {{ s.status }}">{{ s.status }}</span></td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                  No recent attendance sessions conducted.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

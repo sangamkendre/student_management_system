@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block page_title %}Student Directory & Enrollments{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h3>All Registered Students</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">View student enrollment numbers, active batches, and manage account statuses.</p>
+    </div>
+    <button type="button" class="btn btn-primary" onclick="openModal('addStudentModal')">
+      <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      <span>Register New Student</span>
+    </button>
+  </div>
+
+  <!-- Search & Filter Controls -->
+  <div style="padding: 14px 24px; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <form method="GET" action="{{ url_for('admin.students') }}" style="display: flex; gap: 10px; flex: 1; max-width: 480px;">
+      <div style="position: relative; flex: 1;">
+        <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="adminStudentSearch" name="search" class="form-control" value="{{ search_query or '' }}" placeholder="Search by contact number or name..." style="padding-left: 36px; padding-right: 32px;" oninput="filterAdminStudentsLive()">
+        {% if search_query %}
+          <a href="{{ url_for('admin.students') }}" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); text-decoration: none; font-size: 18px; line-height: 1;">&times;</a>
+        {% endif %}
+      </div>
+      <button type="submit" class="btn btn-secondary">Search</button>
+      {% if search_query %}
+        <a href="{{ url_for('admin.students') }}" class="btn btn-secondary">Reset</a>
+      {% endif %}
+    </form>
+    <div id="adminSearchCount" style="font-size: 13px; color: var(--text-muted);">
+      Showing <strong>{{ students|length }}</strong> student{{ 's' if students|length != 1 else '' }}
+      {% if search_query %} for &ldquo;{{ search_query }}&rdquo;{% endif %}
+    </div>
+  </div>
+
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table" id="adminStudentsTable">
+        <thead>
+          <tr>
+            <th>Enrollment No</th>
+            <th>Student Name</th>
+            <th>Email</th>
+            <th>Contact / Phone</th>
+            <th>Active Batches</th>
+            <th>Status</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+            <tr class="student-item-row" data-name="{{ s.full_name|lower }}" data-phone="{{ (s.phone or '')|lower }}" data-eno="{{ (s.enrollment_number or '')|lower }}" data-email="{{ s.email|lower }}">
+              <td>
+                <span style="font-family: monospace; font-size: 13px; font-weight: 700; color: var(--primary); background: #eef2ff; padding: 3px 8px; border-radius: 6px;">
+                  {{ s.enrollment_number or 'UNASSIGNED' }}
+                </span>
+              </td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #dbeafe; color: #1d4ed8; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                    {{ s.full_name[0]|upper }}
+                  </div>
+                  <div>
+                    <strong>{{ s.full_name }}</strong>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">Registered {{ s.created_at.strftime('%d %b %Y') if s.created_at else '' }}</div>
+                  </div>
+                </div>
+              </td>
+              <td>{{ s.email }}</td>
+              <td>{{ s.phone or '-' }}</td>
+              <td>
+                {% if s.enrolled_batches %}
+                  <span style="font-size: 12.5px; font-weight: 500; color: var(--text-secondary);">{{ s.enrolled_batches }}</span>
+                {% else %}
+                  <span style="color: var(--text-muted); font-size: 12px; font-style: italic;">Not enrolled</span>
+                {% endif %}
+              </td>
+              <td><span class="status-pill {{ s.status }}">{{ s.status }}</span></td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 4px; justify-content: flex-end; align-items: center;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('editStudentModal{{ s.student_id }}')">Edit</button>
+                  <form method="POST" action="{{ url_for('admin.delete_student', student_id=s.student_id) }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to permanently delete student {{ s.full_name }}? All enrollment records and attendance history will be deleted.');">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Delete Student">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+
+            <!-- Edit Student Modal -->
+            <div class="modal-backdrop" id="editStudentModal{{ s.student_id }}">
+              <div class="modal-dialog">
+                <div class="modal-header">
+                  <h4>Edit Student: {{ s.full_name }}</h4>
+                  <button type="button" class="modal-close" onclick="closeModal('editStudentModal{{ s.student_id }}')">&times;</button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.edit_student', student_id=s.student_id) }}">
+                  <div class="modal-body">
+                    <div class="form-group">
+                      <label class="form-label">Full Name</label>
+                      <input type="text" name="full_name" class="form-control" value="{{ s.full_name }}" required>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ s.email }}" required>
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="phone" class="form-control" value="{{ s.phone or '' }}">
+                      </div>
+                    </div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label">Enrollment Number</label>
+                        <input type="text" name="enrollment_number" class="form-control" value="{{ s.enrollment_number or '' }}">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Account Status</label>
+                        <select name="status" class="form-control">
+                          <option value="active" {% if s.status == 'active' %}selected{% endif %}>Active</option>
+                          <option value="inactive" {% if s.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">New Password (leave blank to keep current)</label>
+                      <input type="password" name="password" class="form-control" placeholder="••••••••">
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('editStudentModal{{ s.student_id }}')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          {% else %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">
+                No students enrolled yet. Click "Register New Student" to add students.
+              </td>
+            </tr>
+          {% endfor %}
+          <tr id="noAdminMatchRow" style="display: none;">
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">
+              No students found matching your search.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Student Modal -->
+<div class="modal-backdrop" id="addStudentModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h4>Register New Student</h4>
+      <button type="button" class="modal-close" onclick="closeModal('addStudentModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('admin.add_student') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="full_name" class="form-control" placeholder="e.g. Bharat Kumar" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input type="email" name="email" class="form-control" placeholder="bharat@gmail.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone Number</label>
+            <input type="text" name="phone" class="form-control" placeholder="+91 91234 56789">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Enrollment Number</label>
+            <input type="text" name="enrollment_number" class="form-control" placeholder="e.g. STU-2026-001">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Assign to Batch (Optional)</label>
+            <select name="batch_id" class="form-control">
+              <option value="">-- Do not assign yet --</option>
+              {% for b in batches %}
+                <option value="{{ b.batch_id }}">{{ b.batch_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Initial Password</label>
+          <input type="password" name="password" class="form-control" placeholder="Default: student123" value="student123">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Enroll Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function filterAdminStudentsLive() {
+    const query = document.getElementById('adminStudentSearch').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.student-item-row');
+    const noMatch = document.getElementById('noAdminMatchRow');
+    const countDisplay = document.getElementById('adminSearchCount');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.getAttribute('data-name') || '';
+      const phone = row.getAttribute('data-phone') || '';
+      const eno = row.getAttribute('data-eno') || '';
+      const email = row.getAttribute('data-email') || '';
+
+      if (!query || name.includes(query) || phone.includes(query) || eno.includes(query) || email.includes(query)) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (noMatch) {
+      noMatch.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+
+    if (countDisplay) {
+      if (query) {
+        countDisplay.innerHTML = `Showing <strong>${visibleCount}</strong> matching student${visibleCount !== 1 ? 's' : ''}`;
+      } else {
+        countDisplay.innerHTML = `Showing <strong>${rows.length}</strong> student${rows.length !== 1 ? 's' : ''}`;
+      }
+    }
+  }
+</script>
+{% endblock %}

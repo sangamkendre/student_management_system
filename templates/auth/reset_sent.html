@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Link Sent - EduManage Portal</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 100%);
+      padding: 20px;
+    }
+    .auth-box {
+      width: 100%;
+      max-width: 500px;
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+    .auth-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #10b981, #06b6d4, #4f46e5);
+    }
+    .icon-badge {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      background: #ecfdf5;
+      color: #059669;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      border: 1px solid #a7f3d0;
+    }
+    .email-highlight {
+      display: inline-block;
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 13.5px;
+      margin: 4px 0;
+    }
+    .simulated-card {
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 18px;
+      margin: 22px 0;
+      text-align: left;
+    }
+    .simulated-card .badge {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .simulated-link {
+      word-break: break-all;
+      background: #ffffff;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #2563eb;
+      margin: 10px 0;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-box">
+    <div class="icon-badge">✉️</div>
+    <h2 style="font-size: 24px; color: #0f172a; margin-bottom: 8px;">Check Your Email</h2>
+    
+    <p style="color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 16px;">
+      We've processed the password reset request for <span class="email-highlight">{{ email }}</span> ({{ role|title }} account).
+    </p>
+
+    {% if email_result.sent %}
+      <div class="alert alert-success" style="margin-bottom: 24px; text-align: left;">
+        <strong>Email Dispatched!</strong> A reset link has been delivered via SMTP to your email inbox. Please click the link within 30 minutes to set your new password.
+      </div>
+    {% endif %}
+
+    {% if email_result.simulated %}
+      <div class="simulated-card">
+        <span class="badge">Development / Local Mode</span>
+        <p style="font-size: 13px; color: #475569; margin: 0 0 10px 0;">
+          SMTP credentials are not configured in <code>.env</code> or local server mode is active. You can reset the password directly using this link:
+        </p>
+        <a href="{{ email_result.reset_url }}" class="simulated-link">
+          {{ email_result.reset_url }}
+        </a>
+        <div style="text-align: center; margin-top: 12px;">
+          <a href="{{ email_result.reset_url }}" class="btn btn-primary btn-sm" style="width: 100%;">
+            👉 Open Password Reset Page Now
+          </a>
+        </div>
+      </div>
+    {% endif %}
+
+    <div style="margin-top: 24px; display: flex; flex-direction: column; gap: 12px;">
+      <a href="{{ url_for('auth.login') }}" class="btn btn-secondary" style="width: 100%;">
+        Return to Sign In
+      </a>
+      <a href="{{ url_for('auth.forgot_password') }}" style="font-size: 13px; color: #64748b; text-decoration: none;">
+        Didn't receive it? <strong style="color: var(--primary);">Try another email address</strong>
+      </a>
+    </div>
+  </div>
+
+</body>
+</html>

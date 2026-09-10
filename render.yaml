@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: student-management-system
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: MYSQL_HOST
+        value: gateway01.ap-northeast-1.prod.aws.tidbcloud.com
+      - key: MYSQL_PORT
+        value: "4000"
+      - key: MYSQL_USER
+        value: 2cehH5YppVnhKiw.root
+      - key: MYSQL_PASSWORD
+        value: gVzrz8rZricxKFoZ
+      - key: MYSQL_DB
+        value: student_management_system
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USE_TLS
+        value: "True"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
+        value: noreply@edumanage.com

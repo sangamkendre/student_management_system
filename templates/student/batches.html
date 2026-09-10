@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block page_title %}My Enrolled Batches{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h3>Enrolled Courses & Cohorts</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Details of your active batches, teacher contact, and schedules.</p>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px;">
+      {% for b in batches %}
+        <div style="background: {% if b.status == 'completed' %}#f0fdf4{% else %}#ffffff{% endif %}; border: 1px solid {% if b.status == 'completed' %}#bbf7d0{% else %}var(--border){% endif %}; border-radius: var(--radius-md); padding: 22px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <span class="status-pill upcoming">{{ b.course_name }}</span>
+              {% if b.status == 'completed' %}
+                <span class="status-pill completed">🎓 Completed</span>
+              {% else %}
+                <span class="status-pill {{ b.status }}">{{ b.status }}</span>
+              {% endif %}
+            </div>
+            <h3 style="font-size: 18px; margin-bottom: 6px;">{{ b.batch_name }}</h3>
+            {% if b.status == 'completed' %}
+              <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 6px; padding: 6px 12px; margin-bottom: 12px; font-size: 12px; color: #047857; display: flex; align-items: center; gap: 6px;">
+                <span>🎉</span> <strong>Coursework Completed!</strong> You have officially completed this cohort.
+              </div>
+            {% endif %}
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+              {{ b.course_desc or 'Comprehensive curriculum designed for industry preparation.' }}
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; font-size: 13px; background: #f8fafc; padding: 14px; border-radius: 8px; margin-bottom: 16px;">
+              <div>⏰ <strong>Class Timing:</strong> {{ b.start_time or 'TBD' }} - {{ b.end_time or 'TBD' }}</div>
+              <div>📅 <strong>Batch Duration:</strong> {{ b.start_date.strftime('%d %b %Y') if b.start_date else 'TBD' }} &rarr; {{ b.end_date.strftime('%d %b %Y') if b.end_date else 'TBD' }}</div>
+              <div>👨‍🏫 <strong>Instructor:</strong> {{ b.teacher_name or 'Faculty' }}</div>
+              {% if b.teacher_email %}
+                <div style="font-size: 12px; color: var(--text-muted);">✉️ {{ b.teacher_email }} {% if b.teacher_phone %}&bull; 📞 {{ b.teacher_phone }}{% endif %}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div>
+            <a href="{{ url_for('student.attendance_history', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm" style="width: 100%;">
+              View Attendance History for this Batch &rarr;
+            </a>
+          </div>
+        </div>
+      {% else %}
+        <p style="text-align: center; color: var(--text-muted); padding: 40px; grid-column: 1/-1;">
+          You have not been assigned to any course batches yet.
+        </p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

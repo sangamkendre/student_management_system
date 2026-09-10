@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - Student Management System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 100%);
+      padding: 20px;
+    }
+    .login-box {
+      width: 100%;
+      max-width: 460px;
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+      padding: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .login-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: linear-gradient(90deg, #4f46e5, #8b5cf6, #06b6d4);
+    }
+    .login-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .login-header .icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, #4f46e5 0%, #8b5cf6 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+    }
+    .login-header h2 {
+      font-size: 24px;
+      color: #0f172a;
+      margin-bottom: 6px;
+    }
+    .login-header p {
+      color: #64748b;
+      font-size: 14px;
+    }
+    .role-tabs {
+      display: flex;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 10px;
+      margin-bottom: 24px;
+      gap: 4px;
+    }
+    .role-tab-btn {
+      flex: 1;
+      padding: 8px 4px;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #64748b;
+      border-radius: 8px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .role-tab-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    }
+    .demo-accounts {
+      margin-top: 26px;
+      padding-top: 20px;
+      border-top: 1px dashed #e2e8f0;
+      text-align: center;
+    }
+    .demo-accounts p {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .demo-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+    }
+    .chip {
+      padding: 5px 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border-radius: 6px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chip:hover {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: #4338ca;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-box">
+    <div class="login-header">
+      <div class="icon">🎓</div>
+      <h2>EduManage Portal</h2>
+      <p>Student, Teacher & Admin Access</p>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="alerts-container">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+              <span>{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+      <!-- Hidden Role selector (defaults to auto or set by tabs) -->
+      <input type="hidden" name="role" id="roleInput" value="{{ selected_role or 'auto' }}">
+
+      <div class="role-tabs">
+        <button type="button" class="role-tab-btn {% if not selected_role or selected_role == 'auto' %}active{% endif %}" onclick="selectRole('auto', this)">Auto Detect</button>
+        <button type="button" class="role-tab-btn {% if selected_role == 'admin' %}active{% endif %}" onclick="selectRole('admin', this)">Admin</button>
+        <button type="button" class="role-tab-btn {% if selected_role == 'teacher' %}active{% endif %}" onclick="selectRole('teacher', this)">Teacher</button>
+        <button type="button" class="role-tab-btn {% if selected_role == 'student' %}active{% endif %}" onclick="selectRole('student', this)">Student</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email Address</label>
+        <input type="email" id="email" name="email" class="form-control" placeholder="name@institute.com" value="{{ email or '' }}" required autofocus>
+      </div>
+
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <label class="form-label" for="password" style="margin-bottom: 0;">Password</label>
+          <a href="{{ url_for('auth.forgot_password') }}" style="font-size: 12.5px; color: var(--primary); text-decoration: none; font-weight: 600;">Forgot Password?</a>
+        </div>
+        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 10px;">
+        Sign In to Portal
+      </button>
+
+      <div style="text-align: center; margin-top: 14px;">
+        <a href="{{ url_for('auth.forgot_password') }}" style="font-size: 13px; color: #64748b; text-decoration: none;">
+          Trouble signing in? <strong style="color: var(--primary);">Reset Password</strong>
+        </a>
+      </div>
+    </form>
+
+    <div class="demo-accounts">
+      <p>Quick Demo Credentials</p>
+      <div class="demo-chips">
+        <button type="button" class="chip" onclick="fillCreds('sangamkendre51@gmail.com', 'tiger$333', 'admin')">
+          👑 Admin (Sangam)
+        </button>
+        <button type="button" class="chip" onclick="fillCreds('rahul@institute.com', 'password123', 'teacher')">
+          👨‍🏫 Teacher (Rahul)
+        </button>
+        <button type="button" class="chip" onclick="fillCreds('bharat@gmail.com', 'student123', 'student')">
+          🎒 Student (Bharat)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function selectRole(role, btn) {
+      document.getElementById('roleInput').value = role;
+      document.querySelectorAll('.role-tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function fillCreds(email, pass, role) {
+      document.getElementById('email').value = email;
+      document.getElementById('password').value = pass;
+      document.getElementById('roleInput').value = role;
+      document.querySelectorAll('.role-tab-btn').forEach(b => {
+        b.classList.toggle('active', b.textContent.toLowerCase().includes(role));
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block page_title %}Scan QR Attendance{% endblock %}
+
+{% block content %}
+<div style="max-width: 580px; margin: 0 auto;">
+  <div class="card" style="text-align: center;">
+    <div class="card-header" style="justify-content: center; flex-direction: column;">
+      <h3>Mark Attendance via QR Code</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+        Point your smartphone or web camera at the QR code displayed on the instructor's screen.
+      </p>
+    </div>
+
+    <div class="card-body">
+      <!-- Camera Viewport with HTML5 QR Scanner -->
+      <div id="reader" style="width: 100%; max-width: 420px; margin: 0 auto 20px; border-radius: 12px; overflow: hidden; background: #0f172a; min-height: 280px; display: flex; align-items: center; justify-content: center; color: #94a3b8; border: 2px dashed #334155;">
+        <div id="cameraPlaceholder">
+          <div style="font-size: 40px; margin-bottom: 8px;">📷</div>
+          <p style="font-size: 13.5px; margin-bottom: 12px;">Camera inactive</p>
+          <button type="button" class="btn btn-primary btn-sm" onclick="startScanner()">
+            Activate Camera Scanner
+          </button>
+        </div>
+      </div>
+
+      <div id="scannerMessage" style="font-size: 13px; font-weight: 600; color: var(--text-muted); margin-bottom: 18px;">
+        Position the QR code within the camera frame
+      </div>
+
+      <!-- Manual Code Entry Alternative -->
+      <div style="margin-top: 24px; padding-top: 20px; border-top: 1px dashed var(--border); text-align: left;">
+        <h4 style="font-size: 14px; margin-bottom: 6px; color: var(--text-main);">
+          Manual Token Check-In
+        </h4>
+        <p style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px;">
+          If camera access is not permitted or unavailable, enter the session token or paste the attendance link below:
+        </p>
+
+        <form id="manualForm" onsubmit="handleManualSubmit(event)" style="display: flex; gap: 8px;">
+          <input type="text" id="manualToken" class="form-control" placeholder="Enter QR token or paste check-in URL" required>
+          <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+            Mark Attendance
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- HTML5 QR Code Scanner Library via CDN -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  let html5QrCode = null;
+
+  function onScanSuccess(decodedText, decodedResult) {
+    // Stop scanning once detected
+    if (html5QrCode) {
+      html5QrCode.stop().catch(err => console.error(err));
+    }
+    document.getElementById('scannerMessage').textContent = "QR Code detected! Recording your attendance...";
+    document.getElementById('scannerMessage').style.color = "#059669";
+
+    // If decodedText is a full URL, redirect directly
+    if (decodedText.startsWith("http://") || decodedText.startsWith("https://") || decodedText.startsWith("/")) {
+      window.location.href = decodedText;
+    } else {
+      // It's a token string
+      window.location.href = `/attendance/mark/${encodeURIComponent(decodedText.trim())}`;
+    }
+  }
+
+  function startScanner() {
+    document.getElementById('cameraPlaceholder').style.display = 'none';
+    html5QrCode = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess,
+      (errorMessage) => {
+        // scan failure callback (silent frame check)
+      }
+    ).catch(err => {
+      console.warn("Could not start camera with environment, falling back", err);
+      // Fallback to any camera
+      html5QrCode.start(
+        { facingMode: "user" },
+        config,
+        onScanSuccess
+      ).catch(e => {
+        document.getElementById('reader').innerHTML = `
+          <div style="padding: 20px; text-align: center; color: #f87171;">
+            <p>⚠️ Camera access could not be initialized (${e.message || 'Permission denied'}).</p>
+            <p style="font-size: 12px; color: #94a3b8; margin-top: 6px;">Please use the manual token check-in below.</p>
+          </div>
+        `;
+      });
+    });
+  }
+
+  function handleManualSubmit(e) {
+    e.preventDefault();
+    let val = document.getElementById('manualToken').value.trim();
+    if (!val) return;
+
+    if (val.includes("/attendance/mark/")) {
+      window.location.href = val;
+    } else if (val.includes("token=")) {
+      const match = val.match(/token=([a-zA-Z0-9_\-]+)/);
+      if (match) {
+        window.location.href = `/attendance/mark/${match[1]}`;
+      } else {
+        window.location.href = val;
+      }
+    } else {
+      window.location.href = `/attendance/mark/${encodeURIComponent(val)}`;
+    }
+  }
+</script>
+{% endblock %}
