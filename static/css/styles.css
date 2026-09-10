@@ -83,7 +83,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-heading);
   color: var(--text-main);
   font-weight: 700;
@@ -396,12 +401,35 @@ a:hover {
   font-size: 24px;
 }
 
-.metric-icon.indigo { background: #e0e7ff; color: #4338ca; }
-.metric-icon.emerald { background: #d1fae5; color: #047857; }
-.metric-icon.purple { background: #ede9fe; color: #6d28d9; }
-.metric-icon.amber { background: #fef3c7; color: #b45309; }
-.metric-icon.rose { background: #ffe4e6; color: #be123c; }
-.metric-icon.sky { background: #e0f2fe; color: #0369a1; }
+.metric-icon.indigo {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.metric-icon.emerald {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.metric-icon.purple {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.metric-icon.amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.metric-icon.rose {
+  background: #ffe4e6;
+  color: #be123c;
+}
+
+.metric-icon.sky {
+  background: #e0f2fe;
+  color: #0369a1;
+}
 
 .metric-details .label {
   font-size: 13px;
@@ -578,7 +606,7 @@ textarea.form-control {
   gap: 16px;
 }
 
-.form-row > * {
+.form-row>* {
   flex: 1;
 }
 
@@ -586,6 +614,7 @@ textarea.form-control {
 .table-responsive {
   width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .custom-table {
@@ -717,9 +746,17 @@ textarea.form-control {
   transition: width 0.4s ease;
 }
 
-.progress-bar-fill.high { background: #10b981; }
-.progress-bar-fill.mid { background: #f59e0b; }
-.progress-bar-fill.low { background: #ef4444; }
+.progress-bar-fill.high {
+  background: #10b981;
+}
+
+.progress-bar-fill.mid {
+  background: #f59e0b;
+}
+
+.progress-bar-fill.low {
+  background: #ef4444;
+}
 
 .progress-label {
   font-size: 12.5px;
@@ -848,18 +885,37 @@ textarea.form-control {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
 }
 
 /* =========================================================
@@ -1005,7 +1061,8 @@ body.sidebar-locked {
 /* Further Mobile Adjustments (< 640px) */
 @media (max-width: 640px) {
   .topbar-right span {
-    display: none; /* Hide 'Signed in as ...' to avoid crowding small mobile viewports */
+    display: none;
+    /* Hide 'Signed in as ...' to avoid crowding small mobile viewports */
   }
 
   .topbar-left h1 {
@@ -1023,6 +1080,52 @@ body.sidebar-locked {
   .card-body {
     padding: 16px;
   }
+
+  /* Form row stacks vertically on phone screens */
+  .form-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Modals fit snugly inside mobile screen bounds */
+  .modal-dialog {
+    margin: 12px;
+    width: calc(100% - 24px);
+    max-height: 92vh;
+  }
+
+  .modal-header {
+    padding: 14px 18px;
+  }
+
+  .modal-body {
+    padding: 18px;
+    max-height: calc(92vh - 120px);
+  }
+
+  .modal-footer {
+    padding: 12px 18px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Receipts fit cleanly on mobile without horizontal clipping */
+  .receipt-card {
+    padding: 22px 16px;
+    margin: 12px auto;
+  }
+
+  .receipt-header {
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  /* Single column metric cards on small mobile viewports */
+  .metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 }
 
 
@@ -1034,15 +1137,19 @@ body.sidebar-locked {
   font-weight: 700;
   letter-spacing: -0.01em;
 }
+
 .amount-paid {
   color: #059669;
 }
+
 .amount-remaining {
   color: #dc2626;
 }
+
 .amount-neutral {
   color: var(--text-main);
 }
+
 .amount-discount {
   color: #0284c7;
 }
@@ -1084,9 +1191,12 @@ body.sidebar-locked {
   body * {
     visibility: hidden;
   }
-  .receipt-card, .receipt-card * {
+
+  .receipt-card,
+  .receipt-card * {
     visibility: visible;
   }
+
   .receipt-card {
     position: absolute;
     left: 0;
@@ -1098,6 +1208,7 @@ body.sidebar-locked {
     box-shadow: none;
     border: none;
   }
+
   .no-print {
     display: none !important;
   }
