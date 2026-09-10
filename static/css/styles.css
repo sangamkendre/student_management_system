@@ -170,6 +170,25 @@ a:hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.sidebar-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.sidebar-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .menu-category {
@@ -922,21 +941,29 @@ textarea.form-control {
    MOBILE SIDEBAR DRAWER & RESPONSIVE NAVIGATION
    ========================================================= */
 
-/* Desktop defaults: hide toggle & close buttons */
+/* Desktop defaults: hide mobile-only controls */
 .mobile-sidebar-toggle {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 38px;
+  gap: 7px;
   height: 38px;
-  padding: 0;
+  padding: 0 12px;
   border-radius: var(--radius-sm);
   background: var(--surface-alt);
   border: 1px solid var(--border);
   color: var(--text-main);
   cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
   transition: all 0.18s ease;
   flex-shrink: 0;
+}
+
+.mobile-sidebar-toggle svg {
+  width: 18px;
+  height: 18px;
 }
 
 .mobile-sidebar-toggle:hover {
@@ -945,15 +972,15 @@ textarea.form-control {
 }
 
 .mobile-sidebar-toggle:active {
-  transform: scale(0.94);
+  transform: scale(0.96);
 }
 
 .sidebar-close-btn {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
@@ -995,10 +1022,19 @@ body.sidebar-locked {
   overflow: hidden !important;
 }
 
+/* Mobile Bottom Navigation Bar (Hidden on Desktop) */
+.mobile-bottom-nav {
+  display: none;
+}
+
 /* Responsive adjustments for Tablets & Mobile (< 900px) */
 @media (max-width: 900px) {
   .mobile-sidebar-toggle {
     display: inline-flex;
+    background: #eef2ff;
+    border-color: #c7d2fe;
+    color: var(--primary);
+    box-shadow: 0 1px 3px rgba(79, 70, 229, 0.12);
   }
 
   .sidebar-close-btn {
@@ -1010,64 +1046,145 @@ body.sidebar-locked {
     top: 0;
     bottom: 0;
     left: 0;
-    width: 280px;
-    max-width: 84vw;
+    width: 290px;
+    max-width: 86vw;
     z-index: 1050;
     transform: translateX(-100%);
     box-shadow: none;
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.28s ease;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease;
   }
 
   .app-sidebar.mobile-open {
     transform: translateX(0);
-    box-shadow: 12px 0 35px rgba(0, 0, 0, 0.5);
+    box-shadow: 16px 0 40px rgba(0, 0, 0, 0.55);
   }
 
   .app-main {
     margin-left: 0 !important;
     width: 100% !important;
     min-width: 0;
+    padding-bottom: 76px !important;
   }
 
   .app-topbar {
-    padding: 0 16px;
-    height: 62px;
+    padding: 0 14px;
+    height: 60px;
   }
 
   .topbar-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-width: 0;
+    flex: 1;
   }
 
   .topbar-left h1 {
-    font-size: 17.5px;
+    font-size: 16.5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 220px;
+    max-width: 190px;
   }
 
   .topbar-right {
-    gap: 10px;
+    gap: 8px;
   }
 
   .content-body {
-    padding: 16px 14px;
+    padding: 16px 12px;
+  }
+
+  /* Bottom Navigation Bar on Mobile */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.08);
+    z-index: 1020;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 4px;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .bottom-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    padding: 6px 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .bottom-nav-item svg {
+    width: 20px;
+    height: 20px;
+    transition: transform 0.18s ease, stroke 0.18s ease;
+  }
+
+  .bottom-nav-item:hover,
+  .bottom-nav-item:focus {
+    color: var(--primary);
+  }
+
+  .bottom-nav-item.active {
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  .bottom-nav-item.active svg {
+    stroke-width: 2.3;
+    transform: translateY(-2px);
+    filter: drop-shadow(0 2px 6px var(--primary-glow));
+  }
+
+  .bottom-nav-item.bottom-nav-menu-btn {
+    color: var(--primary);
+    position: relative;
+  }
+
+  .bottom-nav-item.bottom-nav-menu-btn span {
+    font-weight: 700;
+  }
+
+  .bottom-nav-item.bottom-nav-menu-btn svg {
+    stroke: var(--primary);
   }
 }
 
 /* Further Mobile Adjustments (< 640px) */
 @media (max-width: 640px) {
-  .topbar-right span {
+  .topbar-right span:not(.logout-text) {
     display: none;
     /* Hide 'Signed in as ...' to avoid crowding small mobile viewports */
   }
 
+  .topbar-right .logout-text {
+    display: none;
+  }
+
   .topbar-left h1 {
-    max-width: 170px;
-    font-size: 16px;
+    max-width: 150px;
+    font-size: 15px;
   }
 
   .card-header {
