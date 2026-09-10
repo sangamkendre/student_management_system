@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block page_title %}Student Profile & Security{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner -->
+<div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border-radius: var(--radius-lg); padding: 26px; color: #ffffff; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(30, 27, 75, 0.3); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+  <div style="display: flex; align-items: center; gap: 18px;">
+    <div style="width: 56px; height: 56px; border-radius: 50%; background: #4f46e5; color: #ffffff; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+      {{ student.full_name[0]|upper }}
+    </div>
+    <div>
+      <div style="display: inline-block; background: rgba(255,255,255,0.15); padding: 3px 9px; border-radius: 6px; font-size: 11.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; font-family: monospace;">
+        {{ student.enrollment_number or 'UNASSIGNED' }}
+      </div>
+      <h2 style="color: #ffffff; font-size: 22px; margin-bottom: 2px;">{{ student.full_name }}</h2>
+      <p style="color: #c7d2fe; font-size: 13.5px;">
+        Student &bull; {{ student.email }} &bull; {{ student.phone or 'No phone number set' }}
+      </p>
+    </div>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <span class="status-pill {{ student.status }}" style="background: rgba(255,255,255,0.2); color: #ffffff; border: 1px solid rgba(255,255,255,0.4); font-size: 13px; padding: 6px 14px;">
+      {{ student.status|capitalize }}
+    </span>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px;">
+
+  <!-- Card 1: Account Information -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Profile Information</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">View your student details and update contact number.</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('student.profile') }}">
+        <input type="hidden" name="action" value="update_info">
+
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="full_name" class="form-control" value="{{ student.full_name }}" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Enrollment ID</label>
+            <input type="text" class="form-control" value="{{ student.enrollment_number or 'Not assigned' }}" disabled style="background: #f8fafc; font-family: monospace; font-weight: 700; color: var(--primary); cursor: not-allowed;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contact Phone</label>
+            <input type="text" name="phone" class="form-control" value="{{ student.phone or '' }}" placeholder="+91 98765 43210">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Registered Email</label>
+          <input type="email" class="form-control" value="{{ student.email }}" disabled style="background: #f8fafc; color: var(--text-muted); cursor: not-allowed;">
+          <small style="color: var(--text-muted); font-size: 11.5px; margin-top: 4px; display: block;">Registered email is used for login identification.</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Enrolled Batches</label>
+          <div style="background: #f1f5f9; padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 500; color: var(--text-secondary);">
+            {{ student.enrolled_batches or 'Not currently enrolled in any active cohorts.' }}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Save Profile Details
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Card 2: Change Password -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Change Password</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Replace your initial password with a new personal password.</p>
+      </div>
+      <span style="font-size: 18px;">🔑</span>
+    </div>
+    <div class="card-body">
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #1e40af; line-height: 1.45;">
+        🔒 <strong>Initial Password:</strong> If you logged in with your default initial password (e.g. <code>student123</code>), please update it below to ensure your account security.
+      </div>
+
+      <form method="POST" action="{{ url_for('student.profile') }}">
+        <input type="hidden" name="action" value="change_password">
+
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <div style="position: relative;">
+            <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current/initial password" required style="padding-right: 40px;">
+            <button type="button" onclick="togglePasswordVisibility('current_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 16px;">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <div style="position: relative;">
+            <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Minimum 6 characters" required style="padding-right: 40px;">
+            <button type="button" onclick="togglePasswordVisibility('new_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 16px;">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <div style="position: relative;">
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Re-type your new password" required style="padding-right: 40px;">
+            <button type="button" onclick="togglePasswordVisibility('confirm_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 16px;">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+          Update Password
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function togglePasswordVisibility(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (field) {
+      field.type = field.type === 'password' ? 'text' : 'password';
+    }
+  }
+</script>
+{% endblock %}

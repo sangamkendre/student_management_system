@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block page_title %}Institute Attendance Reports & Analytics{% endblock %}
+
+{% block content %}
+<!-- Filters Toolbar -->
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-body" style="padding: 18px 24px;">
+    <form method="GET" action="{{ url_for('admin.reports') }}" style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;">
+      
+      <div style="flex: 1; min-width: 160px;">
+        <label class="form-label" style="font-size: 12px;">Filter Course</label>
+        <select name="course_id" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="">All Courses</option>
+          {% for c in courses %}
+            <option value="{{ c.course_id }}" {% if filter_course|string == c.course_id|string %}selected{% endif %}>{{ c.course_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex: 1; min-width: 160px;">
+        <label class="form-label" style="font-size: 12px;">Filter Batch</label>
+        <select name="batch_id" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="">All Batches</option>
+          {% for b in batches %}
+            <option value="{{ b.batch_id }}" {% if filter_batch|string == b.batch_id|string %}selected{% endif %}>{{ b.batch_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex: 1; min-width: 160px;">
+        <label class="form-label" style="font-size: 12px;">Filter Teacher</label>
+        <select name="teacher_id" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="">All Teachers</option>
+          {% for t in teachers %}
+            <option value="{{ t.teacher_id }}" {% if filter_teacher|string == t.teacher_id|string %}selected{% endif %}>{{ t.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="width: 150px;">
+        <label class="form-label" style="font-size: 12px;">Date</label>
+        <input type="date" name="date" class="form-control" style="padding: 8px 12px; font-size: 13px;" value="{{ filter_date }}">
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button type="submit" class="btn btn-primary btn-sm" style="height: 38px;">Apply Filters</button>
+        <a href="{{ url_for('admin.reports') }}" class="btn btn-secondary btn-sm" style="height: 38px;">Reset</a>
+        <a href="{{ url_for('admin.export_csv') }}" class="btn btn-success btn-sm" style="height: 38px;">
+          <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Export CSV</span>
+        </a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Aggregated Statistics -->
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="metric-icon indigo">📋</div>
+    <div class="metric-details">
+      <div class="label">Total Check-Ins</div>
+      <div class="value">{{ total_possible }}</div>
+      <div class="subtext">Expected attendance slots</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon emerald">✅</div>
+    <div class="metric-details">
+      <div class="label">Present Days</div>
+      <div class="value">{{ total_presents }}</div>
+      <div class="subtext">Students attended</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon rose">❌</div>
+    <div class="metric-details">
+      <div class="label">Absent Days</div>
+      <div class="value">{{ total_absents }}</div>
+      <div class="subtext">Missed sessions</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon purple">📊</div>
+    <div class="metric-details">
+      <div class="label">Overall Attendance</div>
+      <div class="value">{{ overall_rate }}%</div>
+      <div class="subtext">Institute-wide average</div>
+    </div>
+  </div>
+</div>
+
+<!-- Batch-wise Attendance Overview Table -->
+<div class="card">
+  <div class="card-header">
+    <h3>Batch-Wise Attendance Summary</h3>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Batch Name</th>
+            <th>Course</th>
+            <th>Instructor</th>
+            <th>Total Sessions</th>
+            <th>Enrolled Students</th>
+            <th>Presents</th>
+            <th>Absents</th>
+            <th style="min-width: 180px;">Attendance Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in batch_summaries %}
+            <tr>
+              <td><strong>{{ b.batch_name }}</strong></td>
+              <td>{{ b.course_name }}</td>
+              <td>{{ b.teacher_name or 'Unassigned' }}</td>
+              <td><strong>{{ b.total_sessions }}</strong></td>
+              <td>{{ b.enrolled_students }}</td>
+              <td><span style="color: #059669; font-weight: 700;">{{ b.total_presents }}</span></td>
+              <td><span style="color: #dc2626; font-weight: 700;">{{ b.absents }}</span></td>
+              <td>
+                <div class="progress-container">
+                  <div class="progress-bar-bg">
+                    <div class="progress-bar-fill {% if b.attendance_rate >= 80 %}high{% elif b.attendance_rate >= 60 %}mid{% else %}low{% endif %}" style="width: {{ b.attendance_rate }}%;"></div>
+                  </div>
+                  <span class="progress-label">{{ b.attendance_rate }}%</span>
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 36px;">
+                No batch attendance data matching the selected filters.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Session Attendance History -->
+<div class="card">
+  <div class="card-header">
+    <h3>Class Session Attendance Log</h3>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Session Date</th>
+            <th>Batch</th>
+            <th>Course</th>
+            <th>Teacher</th>
+            <th>Turnout</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in recent_sessions %}
+            <tr>
+              <td>
+                <strong>{{ s.session_date }}</strong>
+                <div style="font-size: 11.5px; color: var(--text-muted);">{{ s.started_at.strftime('%I:%M %p') if s.started_at else '' }}</div>
+              </td>
+              <td><strong>{{ s.batch_name }}</strong></td>
+              <td>{{ s.course_name }}</td>
+              <td>{{ s.teacher_name }}</td>
+              <td>
+                <span style="font-weight: 700; color: #047857;">{{ s.present_count }}</span> / {{ s.total_students }} Present
+              </td>
+              <td>
+                <span class="status-pill {{ s.status }}">{{ s.status }}</span>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 36px;">
+                No attendance sessions recorded yet.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

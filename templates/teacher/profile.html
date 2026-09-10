@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block page_title %}Instructor Profile & Security{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner -->
+<div style="background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); border-radius: var(--radius-lg); padding: 26px; color: #ffffff; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(13, 148, 136, 0.25); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+  <div style="display: flex; align-items: center; gap: 18px;">
+    <div style="width: 56px; height: 56px; border-radius: 50%; background: #ffffff; color: #0f766e; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+      {{ teacher.full_name[0]|upper }}
+    </div>
+    <div>
+      <h2 style="color: #ffffff; font-size: 22px; margin-bottom: 2px;">{{ teacher.full_name }}</h2>
+      <p style="color: #ccfbf1; font-size: 13.5px;">
+        Instructor &bull; {{ teacher.specialization or 'General Instructor' }} &bull; {{ teacher.email }}
+      </p>
+    </div>
+  </div>
+  <div style="display: flex; gap: 10px;">
+    <span class="status-pill {{ teacher.status }}" style="background: rgba(255,255,255,0.2); color: #ffffff; border: 1px solid rgba(255,255,255,0.4); font-size: 13px; padding: 6px 14px;">
+      {{ teacher.status|capitalize }}
+    </span>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px;">
+
+  <!-- Card 1: Account Details -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Account & Contact Details</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Manage your instructor profile information.</p>
+      </div>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('teacher.profile') }}">
+        <input type="hidden" name="action" value="update_info">
+
+        <div class="form-group">
+          <label class="form-label">Full Name</label>
+          <input type="text" name="full_name" class="form-control" value="{{ teacher.full_name }}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address (Login ID)</label>
+          <input type="email" class="form-control" value="{{ teacher.email }}" disabled style="background: #f8fafc; color: var(--text-muted); cursor: not-allowed;">
+          <small style="color: var(--text-muted); font-size: 11.5px; margin-top: 4px; display: block;">Contact admin to modify registered email address.</small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Contact Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ teacher.phone or '' }}" placeholder="+91 98765 43210">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Specialization</label>
+          <input type="text" name="specialization" class="form-control" value="{{ teacher.specialization or '' }}" placeholder="e.g. Python Full Stack, AI & Data Science">
+        </div>
+
+        <div style="background: #f1f5f9; border-radius: var(--radius-sm); padding: 14px; margin-bottom: 20px; display: flex; justify-content: space-around; text-align: center;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Active Batches</div>
+            <strong style="font-size: 18px; color: var(--primary);">{{ teacher.active_batches or 0 }}</strong>
+          </div>
+          <div style="border-left: 1px solid var(--border); padding-left: 20px;">
+            <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Total Students</div>
+            <strong style="font-size: 18px; color: #0d9488;">{{ teacher.total_students or 0 }}</strong>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">
+          Save Profile Info
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Card 2: Change Password -->
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <h3>Change Password</h3>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Update your initial login password for account security.</p>
+      </div>
+      <span style="font-size: 18px;">🔐</span>
+    </div>
+    <div class="card-body">
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: var(--radius-sm); padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: #1e40af; line-height: 1.45;">
+        💡 <strong>Security Note:</strong> If you are logging in with an initial password assigned by the administration, please change it now to a private, strong password.
+      </div>
+
+      <form method="POST" action="{{ url_for('teacher.profile') }}">
+        <input type="hidden" name="action" value="change_password">
+
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <div style="position: relative;">
+            <input type="password" id="current_password" name="current_password" class="form-control" placeholder="Enter your current password" required style="padding-right: 40px;">
+            <button type="button" onclick="togglePasswordVisibility('current_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 16px;">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <div style="position: relative;">
+            <input type="password" id="new_password" name="new_password" class="form-control" placeholder="Minimum 6 characters" required style="padding-right: 40px;">
+            <button type="button" onclick="togglePasswordVisibility('new_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 16px;">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <div style="position: relative;">
+            <input type="password" id="confirm_password" name="confirm_password" class="form-control" placeholder="Re-type new password" required style="padding-right: 40px;">
+            <button type="button" onclick="togglePasswordVisibility('confirm_password')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; color: var(--text-muted); font-size: 16px;">
+              👁️
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+          Update Password
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function togglePasswordVisibility(fieldId) {
+    const field = document.getElementById(fieldId);
+    if (field) {
+      field.type = field.type === 'password' ? 'text' : 'password';
+    }
+  }
+</script>
+{% endblock %}

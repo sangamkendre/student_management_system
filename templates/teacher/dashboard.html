@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block page_title %}Instructor Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome Banner -->
+<div style="background: linear-gradient(135deg, #0d9488 0%, #115e59 100%); border-radius: var(--radius-lg); padding: 28px; color: #ffffff; margin-bottom: 28px; box-shadow: 0 10px 25px rgba(13, 148, 136, 0.25); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+  <div>
+    <h2 style="color: #ffffff; font-size: 24px; margin-bottom: 6px;">Welcome back, {{ teacher.full_name }}! 👋</h2>
+    <p style="color: #ccfbf1; font-size: 14px;">
+      Specialization: <strong>{{ teacher.specialization or 'General Instructor' }}</strong> &bull; Email: {{ teacher.email }}
+    </p>
+  </div>
+  <div>
+    <a href="{{ url_for('teacher.batches') }}" class="btn btn-secondary" style="background: #ffffff; color: #0f766e; font-weight: 700;">
+      View All My Batches
+    </a>
+  </div>
+</div>
+
+<!-- Metrics Overview -->
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="metric-icon emerald">👥</div>
+    <div class="metric-details">
+      <div class="label">Assigned Batches</div>
+      <div class="value">{{ total_batches }}</div>
+      <div class="subtext">Active cohorts</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon indigo">👨‍🎓</div>
+    <div class="metric-details">
+      <div class="label">Total Students</div>
+      <div class="value">{{ total_students }}</div>
+      <div class="subtext">Under your guidance</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon purple">⚡</div>
+    <div class="metric-details">
+      <div class="label">Sessions Held</div>
+      <div class="value">{{ total_sessions }}</div>
+      <div class="subtext">Completed QR check-ins</div>
+    </div>
+  </div>
+</div>
+
+<!-- Batches Cards Grid -->
+<div class="card">
+  <div class="card-header">
+    <h3>My Assigned Batches</h3>
+    <span style="font-size: 13px; color: var(--text-muted);">Start temporary QR attendance sessions directly</span>
+  </div>
+  <div class="card-body">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
+      {% for b in batches %}
+        <div style="background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+              <h4 style="font-size: 17px; color: var(--text-main);">{{ b.batch_name }}</h4>
+              <span class="status-pill {{ b.status }}">{{ b.status }}</span>
+            </div>
+            <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">
+              <strong>{{ b.course_name }}</strong> ({{ b.duration or 'Regular' }})
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>⏰ Timing:</span>
+                <strong style="color: var(--text-main);">{{ b.start_time or 'TBD' }} - {{ b.end_time or 'TBD' }}</strong>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>📅 Date:</span>
+                <span>{{ b.start_date.strftime('%d %b %Y') if b.start_date else 'TBD' }}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span>👥 Enrolled:</span>
+                <strong style="color: var(--primary);">{{ b.student_count }} Students</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; border-top: 1px solid var(--border); padding-top: 16px; align-items: center;">
+            <a href="{{ url_for('teacher.batch_students', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm" style="flex: 1;">
+              Students Roster
+            </a>
+            <a href="{{ url_for('teacher.batch_reports', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm">
+              Reports
+            </a>
+            {% if b.status != 'completed' %}
+              <button type="button" class="btn btn-success btn-sm" onclick="openModal('startModal{{ b.batch_id }}')">
+                ⚡ Start QR
+              </button>
+            {% else %}
+              <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); padding: 5px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                🎓 Concluded
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Start Session Modal for this batch -->
+        <div class="modal-backdrop" id="startModal{{ b.batch_id }}">
+          <div class="modal-dialog">
+            <div class="modal-header">
+              <h4>Start Attendance Session</h4>
+              <button type="button" class="modal-close" onclick="closeModal('startModal{{ b.batch_id }}')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('teacher.start_attendance', batch_id=b.batch_id) }}">
+              <div class="modal-body">
+                <p style="margin-bottom: 16px; color: var(--text-secondary); font-size: 14px;">
+                  Starting attendance for <strong>{{ b.batch_name }}</strong>. The system will create a unique dynamic QR code for students in this batch to scan.
+                </p>
+                <div class="form-group">
+                  <label class="form-label">QR Code Validity Duration</label>
+                  <select name="duration" class="form-control">
+                    <option value="2">2 Minutes (Rapid)</option>
+                    <option value="5" selected>5 Minutes (Recommended)</option>
+                    <option value="10">10 Minutes (Standard)</option>
+                    <option value="15">15 Minutes (Extended)</option>
+                  </select>
+                  <span style="font-size: 12px; color: var(--text-muted); margin-top: 4px; display: block;">
+                    After expiration, students will no longer be able to mark attendance with this code.
+                  </span>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('startModal{{ b.batch_id }}')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Generate QR Code & Start</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+      {% else %}
+        <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
+          You have not been assigned to any batches yet. Please contact your system administrator.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Recent Sessions -->
+{% if recent_sessions %}
+<div class="card">
+  <div class="card-header">
+    <h3>Recent Sessions Conducted</h3>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Batch</th>
+            <th>Course</th>
+            <th>Attendees</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in recent_sessions %}
+            <tr>
+              <td>
+                <strong>{{ s.session_date }}</strong>
+                <div style="font-size: 11.5px; color: var(--text-muted);">{{ s.started_at.strftime('%I:%M %p') if s.started_at else '' }}</div>
+              </td>
+              <td><strong>{{ s.batch_name }}</strong></td>
+              <td>{{ s.course_name }}</td>
+              <td><span class="status-pill present">{{ s.attendee_count }} Students</span></td>
+              <td><span class="status-pill {{ s.status }}">{{ s.status }}</span></td>
+              <td style="text-align: right;">
+                <a href="{{ url_for('teacher.session_view', session_id=s.session_id) }}" class="btn btn-secondary btn-sm">View QR / Roster</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

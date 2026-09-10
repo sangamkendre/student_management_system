@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block page_title %}Batch Student Roster - {{ batch.batch_name }}{% endblock %}
+
+{% block content %}
+<!-- Batch Summary Card -->
+<div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);">
+  <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div>
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+        <span style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">
+          {{ batch.course_name }}
+        </span>
+        <span class="status-pill {{ batch.status }}">{{ batch.status }}</span>
+      </div>
+      <h2 style="font-size: 22px; margin-bottom: 4px;">{{ batch.batch_name }}</h2>
+      <div style="font-size: 13px; color: var(--text-muted);">
+        Schedule: {{ batch.start_time or 'TBD' }} - {{ batch.end_time or 'TBD' }} &bull; Total Classes Held: <strong>{{ total_batch_sessions }}</strong>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+      <a href="{{ url_for('teacher.export_batch_students_csv', batch_id=batch.batch_id) }}" class="btn btn-secondary" title="Download formatted student list for this batch (CSV/Excel)">
+        <svg style="width: 15px; height: 15px; margin-right: 5px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span>Download CSV</span>
+      </a>
+      <a href="{{ url_for('teacher.batch_reports', batch_id=batch.batch_id) }}" class="btn btn-secondary">
+
+        📊 Attendance Report
+      </a>
+      {% if batch.status != 'completed' %}
+        <button type="button" class="btn btn-primary" onclick="openModal('addStudentToBatchModal')">
+          ➕ Enroll Student
+        </button>
+        <form method="POST" action="{{ url_for('teacher.complete_batch', batch_id=batch.batch_id) }}" onsubmit="return confirm('Mark this batch as COMPLETED? This will conclude classes and mark enrolled students as completed.');" style="display: inline;">
+          <input type="hidden" name="next" value="batch_students">
+          <button type="submit" class="btn btn-warning" title="Flag batch as completed">
+            🎓 Complete Batch
+          </button>
+        </form>
+      {% else %}
+        <form method="POST" action="{{ url_for('teacher.reopen_batch', batch_id=batch.batch_id) }}" onsubmit="return confirm('Reopen this batch to ACTIVE status?');" style="display: inline;">
+          <input type="hidden" name="next" value="batch_students">
+          <button type="submit" class="btn btn-secondary" title="Reopen Batch">
+            🔄 Reopen Batch
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if batch.status == 'completed' %}
+<div class="alert alert-success" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; border-left: 4px solid #10b981; background: #ecfdf5; color: #065f46; border-radius: var(--radius-md); padding: 16px 20px;">
+  <div style="display: flex; align-items: center; gap: 14px;">
+    <span style="font-size: 28px;">🎓</span>
+    <div>
+      <h4 style="margin: 0 0 4px 0; font-size: 15px; font-weight: 700; color: #065f46;">Batch Marked as COMPLETED</h4>
+      <p style="margin: 0; font-size: 13px; color: #047857;">Coursework and sessions have concluded. All enrolled students see their course completion badge and final attendance standing.</p>
+    </div>
+  </div>
+  <span class="status-pill completed" style="font-weight: 700; font-size: 12px;">Completed</span>
+</div>
+{% endif %}
+
+<!-- Student Roster Table -->
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <h3>Enrolled Students ({{ students|length }})</h3>
+    <div style="position: relative; width: 100%; max-width: 320px;">
+      <svg style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="rosterSearchInput" class="form-control" placeholder="Search by name or contact number..." style="padding-left: 32px; padding-top: 6px; padding-bottom: 6px; font-size: 13px;" oninput="filterRosterLive()">
+    </div>
+  </div>
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table" id="rosterTable">
+        <thead>
+          <tr>
+            <th>Enrollment No</th>
+            <th>Student Name</th>
+            <th>Email</th>
+            <th>Contact / Phone</th>
+            <th>Present</th>
+            <th>Absent</th>
+            <th style="min-width: 180px;">Attendance %</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+            <tr class="roster-row" data-name="{{ s.full_name|lower }}" data-phone="{{ (s.phone or '')|lower }}" data-eno="{{ (s.enrollment_number or '')|lower }}" data-email="{{ s.email|lower }}">
+              <td>
+                <span style="font-family: monospace; font-weight: 700; color: var(--primary); background: #eef2ff; padding: 2px 7px; border-radius: 4px; font-size: 12.5px;">
+                  {{ s.enrollment_number or 'UNASSIGNED' }}
+                </span>
+              </td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">
+                    {{ s.full_name[0]|upper }}
+                  </div>
+                  <div>
+                    <strong>{{ s.full_name }}</strong>
+                    <div style="font-size: 11.5px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                      <span>Enrolled {{ s.joined_at.strftime('%d %b %Y') if s.joined_at else '' }}</span>
+                      {% if s.enrollment_status == 'completed' %}
+                        <span class="status-pill completed" style="font-size: 10px; padding: 1px 6px;">Completed</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td>{{ s.email }}</td>
+              <td>{{ s.phone or '-' }}</td>
+              <td><strong style="color: #059669;">{{ s.present_count }}</strong></td>
+              <td><strong style="color: #dc2626;">{{ s.absent_count }}</strong></td>
+              <td>
+                <div class="progress-container">
+                  <div class="progress-bar-bg">
+                    <div class="progress-bar-fill {% if s.attendance_pct >= 80 %}high{% elif s.attendance_pct >= 60 %}mid{% else %}low{% endif %}" style="width: {{ s.attendance_pct }}%;"></div>
+                  </div>
+                  <span class="progress-label">{{ s.attendance_pct }}%</span>
+                </div>
+              </td>
+              <td style="text-align: right;">
+                <form method="POST" action="{{ url_for('teacher.remove_student_from_batch', batch_id=batch.batch_id, student_id=s.student_id) }}" onsubmit="return confirm('Remove {{ s.full_name }} from this batch?');">
+                  <button type="submit" class="btn btn-secondary btn-sm" style="color: #dc2626;">Remove</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 36px;">
+                No students enrolled in this batch yet. Click "Enroll Student" above to add students.
+              </td>
+            </tr>
+          {% endfor %}
+          <tr id="noRosterMatchRow" style="display: none;">
+            <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 36px;">
+              No enrolled students match your search.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Enroll Student Modal -->
+<div class="modal-backdrop" id="addStudentToBatchModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h4>Enroll Student into {{ batch.batch_name }}</h4>
+      <button type="button" class="modal-close" onclick="closeModal('addStudentToBatchModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('teacher.add_student_to_batch', batch_id=batch.batch_id) }}">
+      <div class="modal-body">
+        
+        <div class="role-tabs" style="margin-bottom: 18px;">
+          <button type="button" class="role-tab-btn active" id="tabExisting" onclick="switchEnrollTab('existing')">Existing Student</button>
+          <button type="button" class="role-tab-btn" id="tabNew" onclick="switchEnrollTab('new')">Register New Student</button>
+        </div>
+        <input type="hidden" name="enroll_type" id="enrollType" value="existing">
+
+        <!-- Option 1: Existing Student -->
+        <div id="sectionExisting">
+          <div class="form-group">
+            <label class="form-label">Select Registered Student</label>
+            {% if available_students %}
+              <div style="margin-bottom: 8px;">
+                <input type="text" id="filterExistingSearch" class="form-control" placeholder="Quick search student by name or contact number..." style="font-size: 13px; padding: 7px 12px;" oninput="filterExistingDropdown()">
+              </div>
+              <select name="student_id" id="existingStudentSelect" class="form-control" size="5" style="height: auto;">
+                <option value="">-- Choose student --</option>
+                {% for st in available_students %}
+                  <option value="{{ st.student_id }}" data-search="{{ st.full_name|lower }} {{ (st.phone or '')|lower }} {{ (st.enrollment_number or '')|lower }} {{ st.email|lower }}">
+                    {{ st.full_name }} {% if st.phone %}&bull; {{ st.phone }}{% endif %} ({{ st.enrollment_number if st.enrollment_number else 'No ID - will auto-generate' }})
+                  </option>
+                {% endfor %}
+              </select>
+            {% else %}
+              <div style="background: #f1f5f9; padding: 12px; border-radius: 8px; font-size: 13px; color: var(--text-muted);">
+                All active registered students are already enrolled in this batch! Switch to "Register New Student" to create a new profile.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Option 2: New Student -->
+        <div id="sectionNew" style="display: none;">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="full_name" class="form-control" placeholder="e.g. Bharat Kumar">
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" placeholder="bharat@gmail.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="text" name="phone" class="form-control" placeholder="+91 98765 43210">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <label class="form-label" style="margin-bottom: 0;">
+                  Enrollment No
+                  <span style="background: #e0e7ff; color: #4338ca; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 4px; margin-left: 6px;">
+                    ⚡ Auto-generated
+                  </span>
+                </label>
+                <button type="button" id="btnRefreshEnrollment" onclick="refreshEnrollmentNumber()" style="border: none; background: transparent; color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 0;">
+                  <span id="refreshIcon" style="display: inline-block; transition: transform 0.3s ease;">🔄</span> Refresh ID
+                </button>
+              </div>
+              <div style="position: relative;">
+                <input type="text" id="enrollmentNumberInput" name="enrollment_number" class="form-control" value="{{ next_enrollment_no or '' }}" placeholder="e.g. STU-2026-001" style="font-family: monospace; font-weight: 600; letter-spacing: 0.03em; padding-right: 36px;">
+                <button type="button" onclick="refreshEnrollmentNumber()" title="Generate next sequential number" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); border: none; background: transparent; cursor: pointer; color: var(--primary); font-size: 15px; padding: 4px;">
+                  ⚡
+                </button>
+              </div>
+              <div style="font-size: 11.5px; color: var(--text-muted); margin-top: 4px;">
+                Pre-filled with next sequential ID. You can keep it, refresh, or enter a custom ID.
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Initial Password</label>
+              <input type="password" name="password" class="form-control" value="student123">
+            </div>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addStudentToBatchModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Student</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  function switchEnrollTab(type) {
+    document.getElementById('enrollType').value = type;
+    if (type === 'existing') {
+      document.getElementById('sectionExisting').style.display = 'block';
+      document.getElementById('sectionNew').style.display = 'none';
+      document.getElementById('tabExisting').classList.add('active');
+      document.getElementById('tabNew').classList.remove('active');
+    } else {
+      document.getElementById('sectionExisting').style.display = 'none';
+      document.getElementById('sectionNew').style.display = 'block';
+      document.getElementById('tabExisting').classList.remove('active');
+      document.getElementById('tabNew').classList.add('active');
+
+      const input = document.getElementById('enrollmentNumberInput');
+      if (input && !input.value.trim()) {
+        refreshEnrollmentNumber();
+      }
+    }
+  }
+
+  function refreshEnrollmentNumber() {
+    const icon = document.getElementById('refreshIcon');
+    const input = document.getElementById('enrollmentNumberInput');
+    if (icon) icon.style.transform = 'rotate(360deg)';
+
+    fetch("{{ url_for('teacher.api_generate_enrollment_number') }}")
+      .then(response => response.json())
+      .then(data => {
+        if (data.success && data.enrollment_number) {
+          input.value = data.enrollment_number;
+          input.style.borderColor = 'var(--primary)';
+          input.style.boxShadow = '0 0 0 3px var(--primary-glow)';
+          setTimeout(() => {
+            input.style.borderColor = '';
+            input.style.boxShadow = '';
+            if (icon) icon.style.transform = 'rotate(0deg)';
+          }, 400);
+        }
+      })
+      .catch(err => {
+        console.error("Failed to generate enrollment number:", err);
+        if (icon) icon.style.transform = 'rotate(0deg)';
+      });
+  }
+
+  function filterRosterLive() {
+    const query = document.getElementById('rosterSearchInput').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.roster-row');
+    const noMatch = document.getElementById('noRosterMatchRow');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.getAttribute('data-name') || '';
+      const phone = row.getAttribute('data-phone') || '';
+      const eno = row.getAttribute('data-eno') || '';
+      const email = row.getAttribute('data-email') || '';
+
+      if (!query || name.includes(query) || phone.includes(query) || eno.includes(query) || email.includes(query)) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (noMatch) {
+      noMatch.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+  }
+
+  function filterExistingDropdown() {
+    const query = document.getElementById('filterExistingSearch').value.toLowerCase().trim();
+    const select = document.getElementById('existingStudentSelect');
+    if (!select) return;
+    const options = select.querySelectorAll('option');
+
+    options.forEach(opt => {
+      if (!opt.value) {
+        opt.style.display = '';
+        return;
+      }
+      const searchText = opt.getAttribute('data-search') || opt.textContent.toLowerCase();
+      if (!query || searchText.includes(query)) {
+        opt.style.display = '';
+      } else {
+        opt.style.display = 'none';
+      }
+    });
+  }
+</script>
+{% endblock %}

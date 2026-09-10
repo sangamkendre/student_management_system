@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or 'Attendance Status' }} - Student Management System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #1e1b4b 0%, #0f172a 100%);
+      padding: 20px;
+    }
+    .result-card {
+      width: 100%;
+      max-width: 480px;
+      background: #ffffff;
+      border-radius: var(--radius-xl);
+      padding: 40px 32px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+      animation: slideUp 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .result-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 6px;
+      background: {% if status == 'success' %}#10b981{% elif status == 'warning' %}#f59e0b{% else %}#ef4444{% endif %};
+    }
+    .status-icon-circle {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 34px;
+      background: {% if status == 'success' %}#d1fae5{% elif status == 'warning' %}#fef3c7{% else %}#fee2e2{% endif %};
+      color: {% if status == 'success' %}#059669{% elif status == 'warning' %}#d97706{% else %}#dc2626{% endif %};
+    }
+    .info-list {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 20px 0;
+      text-align: left;
+      font-size: 13.5px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 6px;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .info-row .lbl {
+      color: var(--text-muted);
+    }
+    .info-row .val {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="result-card">
+    <div class="status-icon-circle">
+      {% if status == 'success' %}
+        ✅
+      {% elif status == 'warning' %}
+        ⚠️
+      {% else %}
+        ❌
+      {% endif %}
+    </div>
+
+    <h2 style="font-size: 22px; margin-bottom: 8px; color: var(--text-main);">
+      {{ title or ('Success' if status == 'success' else 'Attention Required') }}
+    </h2>
+
+    <p style="color: var(--text-secondary); font-size: 14.5px; line-height: 1.5;">
+      {{ message }}
+    </p>
+
+    {% if batch_name or course_name or marked_at %}
+      <div class="info-list">
+        {% if batch_name %}
+          <div class="info-row">
+            <span class="lbl">Class Batch</span>
+            <span class="val">{{ batch_name }}</span>
+          </div>
+        {% endif %}
+        {% if course_name %}
+          <div class="info-row">
+            <span class="lbl">Course</span>
+            <span class="val">{{ course_name }}</span>
+          </div>
+        {% endif %}
+        {% if teacher_name %}
+          <div class="info-row">
+            <span class="lbl">Instructor</span>
+            <span class="val">{{ teacher_name }}</span>
+          </div>
+        {% endif %}
+        {% if marked_at %}
+          <div class="info-row">
+            <span class="lbl">Recorded At</span>
+            <span class="val">{{ marked_at }}</span>
+          </div>
+        {% endif %}
+        {% if status == 'success' %}
+          <div class="info-row">
+            <span class="lbl">Status</span>
+            <span class="val" style="color: #059669;">PRESENT</span>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div style="margin-top: 24px; display: flex; gap: 10px; justify-content: center;">
+      {% if session.get('role') == 'student' %}
+        <a href="{{ url_for('student.dashboard') }}" class="btn btn-primary">
+          Go to Student Dashboard
+        </a>
+        <a href="{{ url_for('student.attendance_history') }}" class="btn btn-secondary">
+          View History
+        </a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">
+          Back to Portal Login
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+</body>
+</html>

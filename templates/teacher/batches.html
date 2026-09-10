@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block page_title %}My Assigned Batches{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h3>Assigned Teaching Batches</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">Manage student rosters, monitor attendance reports, and conduct live QR sessions.</p>
+    </div>
+  </div>
+
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Batch Name</th>
+            <th>Course</th>
+            <th>Class Timing</th>
+            <th>Dates</th>
+            <th>Students</th>
+            <th>Sessions Held</th>
+            <th>Status</th>
+            <th style="text-align: right;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in batches %}
+            <tr>
+              <td>
+                <strong style="color: var(--primary); font-size: 15px;">{{ b.batch_name }}</strong>
+              </td>
+              <td><strong>{{ b.course_name }}</strong> ({{ b.duration or 'Course' }})</td>
+              <td>
+                <span style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); background: #f1f5f9; padding: 4px 8px; border-radius: 6px;">
+                  {{ b.start_time or 'TBD' }} - {{ b.end_time or 'TBD' }}
+                </span>
+              </td>
+              <td>
+                <span style="font-size: 12px; color: var(--text-muted);">
+                  {{ b.start_date.strftime('%d %b %Y') if b.start_date else 'TBD' }} &rarr; {{ b.end_date.strftime('%d %b %Y') if b.end_date else 'TBD' }}
+                </span>
+              </td>
+              <td>
+                <a href="{{ url_for('teacher.batch_students', batch_id=b.batch_id) }}" style="font-weight: 700; color: var(--primary);">
+                  {{ b.student_count }} Enrolled
+                </a>
+              </td>
+              <td>
+                <strong>{{ b.session_count }}</strong> classes
+              </td>
+              <td><span class="status-pill {{ b.status }}">{{ b.status }}</span></td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 6px; align-items: center;">
+                  <a href="{{ url_for('teacher.batch_students', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm" title="View/Add Students">
+                    👥 Students
+                  </a>
+                  <a href="{{ url_for('teacher.export_batch_students_csv', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm" title="Download Student List (CSV)">
+                    📥 CSV
+                  </a>
+                  <a href="{{ url_for('teacher.batch_reports', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm" title="Attendance History & %">
+
+                    📊 Reports
+                  </a>
+                  {% if b.status != 'completed' %}
+                    <button type="button" class="btn btn-primary btn-sm" onclick="openModal('startBatchModal{{ b.batch_id }}')">
+                      ⚡ Start QR
+                    </button>
+                    <form method="POST" action="{{ url_for('teacher.complete_batch', batch_id=b.batch_id) }}" style="display: inline;" onsubmit="return confirm('Flag batch \'{{ b.batch_name }}\' as COMPLETED? This signifies all lectures/classes have concluded and sets student enrollments as completed.');">
+                      <input type="hidden" name="next" value="batches">
+                      <button type="submit" class="btn btn-warning btn-sm" title="Flag batch as completed">
+                        🎓 Complete
+                      </button>
+                    </form>
+                  {% else %}
+                    <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #059669; border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700;">
+                      🎓 Concluded
+                    </span>
+                    <form method="POST" action="{{ url_for('teacher.reopen_batch', batch_id=b.batch_id) }}" style="display: inline;" onsubmit="return confirm('Reopen batch \'{{ b.batch_name }}\' to ACTIVE status?');">
+                      <input type="hidden" name="next" value="batches">
+                      <button type="submit" class="btn btn-secondary btn-sm" title="Reopen Batch">
+                        🔄 Reopen
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+
+            <!-- Start Session Modal -->
+            <div class="modal-backdrop" id="startBatchModal{{ b.batch_id }}">
+              <div class="modal-dialog">
+                <div class="modal-header">
+                  <h4>Launch Attendance: {{ b.batch_name }}</h4>
+                  <button type="button" class="modal-close" onclick="closeModal('startBatchModal{{ b.batch_id }}')">&times;</button>
+                </div>
+                <form method="POST" action="{{ url_for('teacher.start_attendance', batch_id=b.batch_id) }}">
+                  <div class="modal-body">
+                    <p style="margin-bottom: 14px; font-size: 13.5px; color: var(--text-secondary);">
+                      Generate a dynamic temporary QR code for <strong>{{ b.batch_name }}</strong> students.
+                    </p>
+                    <div class="form-group">
+                      <label class="form-label">Session Duration (Auto-Expiry)</label>
+                      <select name="duration" class="form-control">
+                        <option value="2">2 Minutes (Fast Check-in)</option>
+                        <option value="5" selected>5 Minutes (Standard)</option>
+                        <option value="10">10 Minutes</option>
+                        <option value="15">15 Minutes</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('startBatchModal{{ b.batch_id }}')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Start & Display QR</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          {% else %}
+            <tr>
+              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 36px;">
+                No batches assigned to your account yet.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

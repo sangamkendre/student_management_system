@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block page_title %}Student Directory & Search{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div>
+      <h3>Student Directory & Search</h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+        Search and lookup student details, contact numbers, and enrolled batches.
+      </p>
+    </div>
+    <div style="font-size: 13px; color: var(--text-muted);">
+      Total: <strong>{{ students|length }}</strong> students
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div style="padding: 14px 24px; background: #f8fafc; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+    <form method="GET" action="{{ url_for('teacher.students') }}" style="display: flex; gap: 10px; flex: 1; max-width: 520px;">
+      <div style="position: relative; flex: 1;">
+        <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="teacherStudentSearch" name="search" class="form-control" value="{{ search_query or '' }}" placeholder="Search by student name or contact number..." style="padding-left: 36px; padding-right: 32px;" oninput="filterTeacherStudentsLive()">
+        {% if search_query %}
+          <a href="{{ url_for('teacher.students') }}" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); text-decoration: none; font-size: 18px; line-height: 1;">&times;</a>
+        {% endif %}
+      </div>
+      <button type="submit" class="btn btn-secondary">Search</button>
+      {% if search_query %}
+        <a href="{{ url_for('teacher.students') }}" class="btn btn-secondary">Reset</a>
+      {% endif %}
+    </form>
+    <div id="teacherSearchCount" style="font-size: 13px; color: var(--text-muted);">
+      Showing <strong>{{ students|length }}</strong> student{{ 's' if students|length != 1 else '' }}
+      {% if search_query %} for &ldquo;{{ search_query }}&rdquo;{% endif %}
+    </div>
+  </div>
+
+  <!-- Students Table -->
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table" id="teacherStudentsTable">
+        <thead>
+          <tr>
+            <th>Enrollment No</th>
+            <th>Student Name</th>
+            <th>Contact / Phone</th>
+            <th>Email</th>
+            <th>Your Batches</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+            <tr class="teacher-student-row" data-name="{{ s.full_name|lower }}" data-phone="{{ (s.phone or '')|lower }}" data-eno="{{ (s.enrollment_number or '')|lower }}" data-email="{{ s.email|lower }}">
+              <td>
+                <span style="font-family: monospace; font-size: 13px; font-weight: 700; color: var(--primary); background: #eef2ff; padding: 3px 8px; border-radius: 6px;">
+                  {{ s.enrollment_number or 'UNASSIGNED' }}
+                </span>
+              </td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px;">
+                    {{ s.full_name[0]|upper }}
+                  </div>
+                  <div>
+                    <strong>{{ s.full_name }}</strong>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">
+                      Joined {{ s.created_at.strftime('%d %b %Y') if s.created_at else '' }}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td>
+                {% if s.phone %}
+                  <a href="tel:{{ s.phone }}" style="color: var(--text-main); font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                    <span style="color: #10b981;">📞</span> {{ s.phone }}
+                  </a>
+                {% else %}
+                  <span style="color: var(--text-muted); font-size: 12.5px;">-</span>
+                {% endif %}
+              </td>
+              <td>{{ s.email }}</td>
+              <td>
+                {% if s.my_batches %}
+                  <span style="font-size: 12.5px; font-weight: 600; color: #0d9488; background: #ccfbf1; padding: 3px 9px; border-radius: 6px;">
+                    {{ s.my_batches }}
+                  </span>
+                {% elif s.all_enrolled_batches %}
+                  <span style="font-size: 12px; color: var(--text-secondary); background: #f1f5f9; padding: 3px 8px; border-radius: 6px;">
+                    Other: {{ s.all_enrolled_batches }}
+                  </span>
+                {% else %}
+                  <span style="color: var(--text-muted); font-size: 12px; font-style: italic;">Not in active batch</span>
+                {% endif %}
+              </td>
+              <td><span class="status-pill {{ s.status }}">{{ s.status }}</span></td>
+              <td style="text-align: right;">
+                {% if s.primary_batch_id %}
+                  <a href="{{ url_for('teacher.batch_students', batch_id=s.primary_batch_id) }}" class="btn btn-secondary btn-sm" title="View Batch Roster">
+                    👥 View Roster
+                  </a>
+                {% else %}
+                  <a href="{{ url_for('teacher.batches') }}" class="btn btn-secondary btn-sm" title="Enroll in batch">
+                    ➕ Enroll in Batch
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">
+                No students found.
+              </td>
+            </tr>
+          {% endfor %}
+          <tr id="noTeacherMatchRow" style="display: none;">
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">
+              No students found matching your search.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function filterTeacherStudentsLive() {
+    const query = document.getElementById('teacherStudentSearch').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.teacher-student-row');
+    const noMatch = document.getElementById('noTeacherMatchRow');
+    const countDisplay = document.getElementById('teacherSearchCount');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+      const name = row.getAttribute('data-name') || '';
+      const phone = row.getAttribute('data-phone') || '';
+      const eno = row.getAttribute('data-eno') || '';
+      const email = row.getAttribute('data-email') || '';
+
+      if (!query || name.includes(query) || phone.includes(query) || eno.includes(query) || email.includes(query)) {
+        row.style.display = '';
+        visibleCount++;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (noMatch) {
+      noMatch.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+    }
+
+    if (countDisplay) {
+      if (query) {
+        countDisplay.innerHTML = `Showing <strong>${visibleCount}</strong> matching student${visibleCount !== 1 ? 's' : ''}`;
+      } else {
+        countDisplay.innerHTML = `Showing <strong>${rows.length}</strong> student${rows.length !== 1 ? 's' : ''}`;
+      }
+    }
+  }
+</script>
+{% endblock %}
