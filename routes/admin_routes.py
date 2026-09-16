@@ -869,7 +869,13 @@ def batch_attendance_sheet(batch_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT batch_id, batch_name FROM batches ORDER BY batch_name ASC")
+    cursor.execute("""
+        SELECT b.batch_id, b.batch_name, c.course_name, b.status,
+               (SELECT COUNT(*) FROM batch_students bs WHERE bs.batch_id = b.batch_id AND bs.status IN ('active', 'completed')) AS student_count
+        FROM batches b
+        JOIN courses c ON b.course_id = c.course_id
+        ORDER BY b.batch_name ASC
+    """)
     all_batches = cursor.fetchall()
 
     cursor.execute("""

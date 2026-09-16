@@ -6,33 +6,30 @@
 <div class="attendance-sheet-container">
 
   <!-- Top Controls & Batch Selector Bar -->
-  <div class="card" style="margin-bottom: 20px; border-top: 4px solid #059669;">
-    <div class="card-body" style="padding: 16px 22px;">
+  <div class="card" style="margin-bottom: 20px; border-top: 4px solid #059669; overflow: visible !important;">
+    <div class="card-body" style="padding: 16px 22px; overflow: visible !important;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
         
         <!-- Left: Batch Switcher & Title -->
         <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
           <div>
             <span class="status-pill {{ current_batch.status }}" style="margin-bottom: 4px;">{{ current_batch.course_name }}</span>
-            <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; flex-wrap: wrap;">
               <h2 style="font-size: 22px; margin: 0; color: var(--text-main);">{{ current_batch.batch_name }}</h2>
               
-              <!-- Batch Switcher Dropdown -->
-              <div class="dropdown-container" style="position: relative; display: inline-block;">
-                <button type="button" class="btn btn-secondary btn-sm" id="batchDropdownBtn" onclick="toggleBatchMenu()" style="display: flex; align-items: center; gap: 6px;">
-                  Switch Batch ▾
-                </button>
-                <div id="batchDropdownMenu" class="custom-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; z-index: 100; min-width: 240px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); padding: 6px 0; margin-top: 4px;">
-                  <div style="padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Your Batches</div>
+              <!-- Batch Switcher Select (Instant Navigation, Never Clipped) -->
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <select id="batchSelectSwitcher" 
+                        class="form-control" 
+                        style="font-size: 13.5px; font-weight: 700; color: #059669; background-color: #f0fdf4; border: 2px solid #a7f3d0; border-radius: 8px; padding: 6px 14px; height: 38px; cursor: pointer; min-width: 240px;"
+                        onchange="if(this.value) window.location.href=this.value;">
                   {% for b in batches %}
-                    <a href="{{ url_for('teacher.attendance_sheet', batch_id=b.batch_id) }}" 
-                       style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 13px; color: var(--text-main); text-decoration: none; transition: background 0.15s; {% if b.batch_id == current_batch.batch_id %}background: #f0fdf4; font-weight: 700; color: #059669;{% endif %}"
-                       onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='{% if b.batch_id == current_batch.batch_id %}#f0fdf4{% else %}transparent{% endif %}'">
-                      <span>{{ b.batch_name }}</span>
-                      <span style="font-size: 11px; color: var(--text-muted); background: #f8fafc; padding: 2px 6px; border-radius: 4px;">{{ b.student_count }} st.</span>
-                    </a>
+                    {% set b_url = url_for('admin.batch_attendance_sheet', batch_id=b.batch_id) if user_role == 'admin' else url_for('teacher.attendance_sheet', batch_id=b.batch_id) %}
+                    <option value="{{ b_url }}" {% if b.batch_id == current_batch.batch_id %}selected{% endif %}>
+                      📂 {{ b.batch_name }} ({{ b.student_count or 0 }} students)
+                    </option>
                   {% endfor %}
-                </div>
+                </select>
               </div>
             </div>
             <p style="color: var(--text-muted); font-size: 12.5px; margin-top: 4px;">
@@ -357,21 +354,8 @@
 
 {% block scripts %}
 <script>
-  // Batch dropdown menu toggle
-  function toggleBatchMenu() {
-    const menu = document.getElementById('batchDropdownMenu');
-    menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
-  }
-
-  // Close menus when clicking outside
+  // Close column dropdown when clicking outside
   document.addEventListener('click', function(e) {
-    const batchBtn = document.getElementById('batchDropdownBtn');
-    const batchMenu = document.getElementById('batchDropdownMenu');
-    if (batchBtn && batchMenu && !batchBtn.contains(e.target) && !batchMenu.contains(e.target)) {
-      batchMenu.style.display = 'none';
-    }
-
-    // Close any open column dropdown
     if (!e.target.closest('.date-header-cell')) {
       document.querySelectorAll('.column-menu').forEach(m => m.style.display = 'none');
     }
