@@ -13,7 +13,10 @@
         Total Sessions Conducted: <strong>{{ total_sessions }}</strong> &bull; Timing: {{ batch.start_time or 'TBD' }} - {{ batch.end_time or 'TBD' }}
       </p>
     </div>
-    <div style="display: flex; gap: 10px;">
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <a href="{{ url_for('teacher.attendance_sheet', batch_id=batch.batch_id) }}" class="btn btn-primary" style="background: #059669; border-color: #059669;">
+        📋 Attendance Matrix Sheet
+      </a>
       <a href="{{ url_for('teacher.batch_students', batch_id=batch.batch_id) }}" class="btn btn-secondary">
         👥 Manage Students
       </a>
@@ -116,9 +119,18 @@
               </td>
               <td><span class="status-pill {{ ses.status }}">{{ ses.status }}</span></td>
               <td style="text-align: right;">
-                <a href="{{ url_for('teacher.session_view', session_id=ses.session_id) }}" class="btn btn-secondary btn-sm">
-                  View Session Roster
-                </a>
+                <div style="display: inline-flex; gap: 6px; align-items: center;">
+                  <a href="{{ url_for('teacher.session_view', session_id=ses.session_id) }}" class="btn btn-secondary btn-sm">
+                    View Roster
+                  </a>
+                  <form method="POST" action="{{ url_for('teacher.delete_session', session_id=ses.session_id) }}" 
+                        onsubmit="return confirm('Permanently delete session for {{ ses.session_date }}? This will remove this attendance session and recalculate student attendance percentages.');" style="display: inline;">
+                    <input type="hidden" name="next" value="{{ request.url }}">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Delete accidental or duplicate session">
+                      🗑️
+                    </button>
+                  </form>
+                </div>
               </td>
             </tr>
           {% else %}

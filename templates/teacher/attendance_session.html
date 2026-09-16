@@ -44,14 +44,38 @@
       </div>
 
       <!-- Action Buttons -->
-      <div style="display: flex; gap: 10px; justify-content: center;">
-        <form method="POST" action="{{ url_for('teacher.close_session', session_id=session.session_id) }}" onsubmit="return confirm('End this attendance session now?');">
-          <button type="submit" class="btn btn-danger btn-sm">
-            🛑 Close Session Now
+      <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 12px;">
+        <!-- Extend Timer / Reopen Button -->
+        <form method="POST" action="{{ url_for('teacher.extend_session', session_id=session.session_id) }}">
+          <input type="hidden" name="minutes" value="5">
+          <button type="submit" class="btn btn-primary btn-sm" style="background: #059669; border-color: #059669;">
+            ➕ Extend Time (+5 Mins)
           </button>
         </form>
+
+        <!-- Close Session Button -->
+        <form method="POST" action="{{ url_for('teacher.close_session', session_id=session.session_id) }}" onsubmit="return confirm('End this attendance session now?');">
+          <button type="submit" class="btn btn-secondary btn-sm">
+            🛑 Close Session
+          </button>
+        </form>
+
+        <!-- Discard / Delete Accidental Session Button -->
+        <form method="POST" action="{{ url_for('teacher.delete_session', session_id=session.session_id) }}" 
+              onsubmit="return confirm('Permanently discard and DELETE this session? This will remove this attendance session and any attendance marked for it, so it does not count as a day held.');">
+          <input type="hidden" name="next" value="{{ url_for('teacher.attendance_sheet', batch_id=session.batch_id) }}">
+          <button type="submit" class="btn btn-danger btn-sm" title="Delete accidental or duplicate session">
+            🗑️ Discard / Delete Session
+          </button>
+        </form>
+      </div>
+
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <a href="{{ url_for('teacher.attendance_sheet', batch_id=session.batch_id) }}" class="btn btn-secondary btn-sm">
+          📋 Attendance Matrix Sheet
+        </a>
         <a href="{{ url_for('teacher.batch_reports', batch_id=session.batch_id) }}" class="btn btn-secondary btn-sm">
-          View Batch Reports
+          📊 Reports
         </a>
       </div>
     </div>

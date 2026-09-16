@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block page_title %}Batch Attendance Matrix Sheet - {{ current_batch.batch_name }}{% endblock %}
+
+{% block content %}
+<div class="attendance-sheet-container">
+
+  <!-- Top Controls & Batch Selector Bar -->
+  <div class="card" style="margin-bottom: 20px; border-top: 4px solid #059669;">
+    <div class="card-body" style="padding: 16px 22px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+        
+        <!-- Left: Batch Switcher & Title -->
+        <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+          <div>
+            <span class="status-pill {{ current_batch.status }}" style="margin-bottom: 4px;">{{ current_batch.course_name }}</span>
+            <div style="display: flex; align-items: center; gap: 10px; margin-top: 4px;">
+              <h2 style="font-size: 22px; margin: 0; color: var(--text-main);">{{ current_batch.batch_name }}</h2>
+              
+              <!-- Batch Switcher Dropdown -->
+              <div class="dropdown-container" style="position: relative; display: inline-block;">
+                <button type="button" class="btn btn-secondary btn-sm" id="batchDropdownBtn" onclick="toggleBatchMenu()" style="display: flex; align-items: center; gap: 6px;">
+                  Switch Batch ▾
+                </button>
+                <div id="batchDropdownMenu" class="custom-dropdown-menu" style="display: none; position: absolute; top: 100%; left: 0; z-index: 100; min-width: 240px; background: white; border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-lg); padding: 6px 0; margin-top: 4px;">
+                  <div style="padding: 6px 14px; font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Your Batches</div>
+                  {% for b in batches %}
+                    <a href="{{ url_for('teacher.attendance_sheet', batch_id=b.batch_id) }}" 
+                       style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; font-size: 13px; color: var(--text-main); text-decoration: none; transition: background 0.15s; {% if b.batch_id == current_batch.batch_id %}background: #f0fdf4; font-weight: 700; color: #059669;{% endif %}"
+                       onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='{% if b.batch_id == current_batch.batch_id %}#f0fdf4{% else %}transparent{% endif %}'">
+                      <span>{{ b.batch_name }}</span>
+                      <span style="font-size: 11px; color: var(--text-muted); background: #f8fafc; padding: 2px 6px; border-radius: 4px;">{{ b.student_count }} st.</span>
+                    </a>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+            <p style="color: var(--text-muted); font-size: 12.5px; margin-top: 4px;">
+              Interactive attendance sheet with click-to-mark matrix across all held classes.
+            </p>
+          </div>
+        </div>
+
+        <!-- Right: Action Buttons -->
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button type="button" class="btn btn-primary btn-sm" onclick="openModal('launchQrModal')" style="background: #059669; border-color: #059669;">
+            ⚡ Start QR Code
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="openModal('addDateModal')">
+            📅 + Add Class Date
+          </button>
+          <a href="{{ url_for('teacher.export_attendance_sheet_csv', batch_id=current_batch.batch_id) }}" class="btn btn-secondary btn-sm" title="Export Full Matrix as CSV/Excel">
+            📥 Export CSV
+          </a>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="window.print()" title="Print Matrix">
+            🖨️ Print
+          </button>
+          <a href="{{ url_for('teacher.batch_reports', batch_id=current_batch.batch_id) }}" class="btn btn-secondary btn-sm">
+            📊 Reports
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Metric Chips -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px;">
+    <div class="card" style="padding: 14px 18px;">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Enrolled Students</div>
+      <div style="font-size: 24px; font-weight: 800; color: var(--primary); margin-top: 4px;">{{ total_students }}</div>
+    </div>
+    <div class="card" style="padding: 14px 18px;">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total Classes Conducted</div>
+      <div style="font-size: 24px; font-weight: 800; color: #059669; margin-top: 4px;">{{ total_sessions }}</div>
+    </div>
+    <div class="card" style="padding: 14px 18px;">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Batch Average Attendance</div>
+      <div style="font-size: 24px; font-weight: 800; color: {% if batch_avg_pct >= 75 %}#059669{% elif batch_avg_pct >= 50 %}#d97706{% else %}#dc2626{% endif %}; margin-top: 4px;">
+        {{ batch_avg_pct }}%
+      </div>
+    </div>
+    <div class="card" style="padding: 14px 18px;">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Today's Session</div>
+      <div style="font-size: 18px; font-weight: 700; margin-top: 6px;">
+        {% if today_session %}
+          <span style="color: #059669;">{{ today_session.present_count }} / {{ total_students }} Present</span>
+        {% else %}
+          <span style="color: var(--text-muted); font-size: 14px;">No class held today</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Filter & Search Bar -->
+  <div class="card" style="margin-bottom: 14px; padding: 12px 18px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <!-- Student Search -->
+      <div style="display: flex; align-items: center; gap: 8px; flex: 1; max-width: 380px;">
+        <span style="color: var(--text-muted); font-size: 14px;">🔍</span>
+        <input type="text" id="studentSearchInput" placeholder="Filter student by name or enrollment number..." 
+               class="form-control" style="font-size: 13px; padding: 6px 12px; height: 36px;" oninput="filterStudents()">
+      </div>
+
+      <!-- Month Filter -->
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <label style="font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin: 0;">Filter Month:</label>
+        <select class="form-control" style="font-size: 13px; padding: 4px 10px; height: 36px; width: auto;" onchange="filterMonth(this.value)">
+          <option value="all" {% if selected_month == 'all' %}selected{% endif %}>All Months ({{ total_sessions }} dates)</option>
+          {% for m in available_months %}
+            <option value="{{ m.ym }}" {% if selected_month == m.ym %}selected{% endif %}>{{ m.ym_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Legend -->
+      <div style="display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-secondary);">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="sheet-checkbox-sample present">☑</span>
+          <span>Present</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="sheet-checkbox-sample absent">☐</span>
+          <span>Absent</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span class="sheet-checkbox-sample holiday">☐</span>
+          <span>Zero Attendance / Holiday</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Attendance Spreadsheet Matrix Table -->
+  <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: var(--shadow-md);">
+    <div class="table-responsive sheet-scroll-container" style="max-height: 680px; overflow-x: auto; overflow-y: auto;">
+      <table class="attendance-matrix-table" id="matrixTable">
+        <thead>
+          <!-- Top Header Row (Green Theme Styled Matching Screenshot) -->
+          <tr class="matrix-header-row">
+            <th class="sticky-col col-sno">#</th>
+            <th class="sticky-col col-name">Student Name</th>
+            <th class="sticky-col col-eno">Enrollment No</th>
+            <th class="sticky-col col-stats">Total P/A</th>
+            <th class="sticky-col col-pct">%</th>
+
+            <!-- Dynamic Session Date Columns -->
+            {% for ses in sessions %}
+              {% set is_empty = (ses.present_count == 0) %}
+              {% set is_today = (ses.session_date == today) %}
+              <th class="matrix-date-col {% if is_empty %}col-holiday{% endif %} {% if is_today %}col-today{% endif %}" data-session-id="{{ ses.session_id }}">
+                <div class="date-header-cell">
+                  <div class="date-header-top">
+                    <span class="date-label {% if is_empty %}text-red{% endif %}">
+                      {{ ses.session_date.strftime('%d %b') }}
+                    </span>
+                    <button type="button" class="header-dropdown-trigger" onclick="toggleHeaderMenu({{ ses.session_id }}, event)" title="Column options">
+                      <span class="caret-icon">∨</span>
+                    </button>
+                  </div>
+                  <div class="date-header-sub">
+                    {{ ses.session_date.strftime('%a') }} &bull; {{ ses.present_count }}P
+                  </div>
+
+                  <!-- Date Column Dropdown Menu -->
+                  <div class="column-menu" id="colMenu{{ ses.session_id }}" style="display: none;">
+                    <div class="column-menu-header">
+                      <strong>{{ ses.session_date.strftime('%a, %d %b %Y') }}</strong>
+                      <div style="font-size: 11px; color: var(--text-muted); font-weight: normal;">
+                        {{ ses.present_count }} / {{ total_students }} Present ({{ ses.status }})
+                      </div>
+                    </div>
+                    <form method="POST" action="{{ url_for('teacher.api_mark_all_session', session_id=ses.session_id) }}" style="margin: 0;">
+                      <input type="hidden" name="action" value="present">
+                      <button type="submit" class="column-menu-item">
+                        ✓ Mark All Present
+                      </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('teacher.api_mark_all_session', session_id=ses.session_id) }}" style="margin: 0;">
+                      <input type="hidden" name="action" value="clear">
+                      <button type="submit" class="column-menu-item" style="color: #dc2626;">
+                        ✗ Clear All (Mark Absent)
+                      </button>
+                    </form>
+                    <a href="{{ url_for('teacher.session_view', session_id=ses.session_id) }}" class="column-menu-item">
+                      🔗 View QR Session Details
+                    </a>
+                    <form method="POST" action="{{ url_for('teacher.delete_session', session_id=ses.session_id) }}" 
+                          onsubmit="return confirm('Permanently delete attendance session for {{ ses.session_date.strftime('%d %b %Y') }}? This removes the session and will restore student percentage accurately.');" 
+                          style="margin: 0; border-top: 1px solid var(--border);">
+                      <input type="hidden" name="next" value="{{ request.url }}">
+                      <button type="submit" class="column-menu-item text-danger" style="color: #dc2626; font-weight: 600;">
+                        🗑️ Delete This Session
+                      </button>
+                    </form>
+                  </div>
+
+                </div>
+              </th>
+            {% else %}
+              <th style="padding: 16px; color: white;">No class sessions held for this period yet.</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody id="matrixTbody">
+          {% for st in students %}
+            <tr class="student-row" id="srow-{{ st.student_id }}" data-name="{{ st.full_name|lower }}" data-eno="{{ (st.enrollment_number or '')|lower }}">
+              <!-- Sticky Left Columns -->
+              <td class="sticky-col col-sno">{{ loop.index }}</td>
+              <td class="sticky-col col-name">
+                <div class="student-cell-info">
+                  <div class="avatar-mini">{{ st.full_name[0]|upper }}</div>
+                  <div>
+                    <strong class="st-name">{{ st.full_name }}</strong>
+                    <div style="font-size: 11px; color: var(--text-muted);">{{ st.email }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="sticky-col col-eno">
+                <span class="eno-badge">{{ st.enrollment_number or 'N/A' }}</span>
+              </td>
+              <td class="sticky-col col-stats">
+                <span class="badge-present" id="stat-p-{{ st.student_id }}">{{ st.present_count }}P</span>
+                <span class="badge-absent" id="stat-a-{{ st.student_id }}">{{ st.absent_count }}A</span>
+              </td>
+              <td class="sticky-col col-pct">
+                <span class="pct-pill {% if st.attendance_pct >= 75 %}high{% elif st.attendance_pct >= 50 %}mid{% else %}low{% endif %}" id="stat-pct-{{ st.student_id }}">
+                  {{ st.attendance_pct }}%
+                </span>
+              </td>
+
+              <!-- Checkbox Matrix Cells (Matching User Screenshot) -->
+              {% for ses in sessions %}
+                {% set is_present = (ses.session_id in att_matrix[st.student_id]) %}
+                {% set is_empty_col = (ses.present_count == 0) %}
+                <td class="matrix-cell {% if is_empty_col %}holiday-cell{% endif %}" 
+                    data-student-id="{{ st.student_id }}" 
+                    data-session-id="{{ ses.session_id }}">
+                  <label class="custom-checkbox-wrapper">
+                    <input type="checkbox" 
+                           class="matrix-checkbox {% if is_empty_col %}checkbox-holiday{% endif %}" 
+                           data-student-id="{{ st.student_id }}" 
+                           data-session-id="{{ ses.session_id }}"
+                           {% if is_present %}checked{% endif %}
+                           onchange="handleCheckboxToggle(this, {{ ses.session_id }}, {{ st.student_id }}, '{{ st.full_name|replace("'", "") }}', '{{ ses.session_date.strftime('%d %b') }}')">
+                    <span class="checkbox-checkmark"></span>
+                  </label>
+                </td>
+              {% else %}
+                <td style="text-align: center; color: var(--text-muted);">-</td>
+              {% endfor %}
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="{{ 5 + (sessions|length if sessions else 1) }}" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                No students enrolled in this batch.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal: Launch QR Attendance (with Smart Duplicate Prevention) -->
+<div class="modal-backdrop" id="launchQrModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h4>Launch Attendance: {{ current_batch.batch_name }}</h4>
+      <button type="button" class="modal-close" onclick="closeModal('launchQrModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('teacher.start_attendance', batch_id=current_batch.batch_id) }}">
+      <div class="modal-body">
+        
+        {% if today_session %}
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px 14px; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 18px;">ℹ️</span>
+              <div>
+                <strong style="color: #1e40af; font-size: 13.5px;">A class session was already recorded today!</strong>
+                <p style="margin: 2px 0 0; font-size: 12.5px; color: #1e3a8a;">
+                  Current status: <strong>{{ today_session.status }}</strong> &bull; 
+                  Attendees marked: <strong>{{ today_session.present_count }} students</strong>.
+                </p>
+              </div>
+            </div>
+            
+            <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="radio" name="mode" value="resume" checked>
+                <span><strong>Reopen / Continue today's session</strong> (extends QR code without creating a duplicate class day)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;">
+                <input type="radio" name="mode" value="new">
+                <span><strong>Start a 2nd distinct class</strong> (records an additional lecture/lab session for today)</span>
+              </label>
+            </div>
+          </div>
+        {% else %}
+          <input type="hidden" name="mode" value="auto">
+          <p style="margin-bottom: 14px; font-size: 13.5px; color: var(--text-secondary);">
+            Generate a dynamic temporary QR code for <strong>{{ current_batch.batch_name }}</strong> students to scan.
+          </p>
+        {% endif %}
+
+        <div class="form-group">
+          <label class="form-label">QR Session Timer (Auto-Expiry)</label>
+          <select name="duration" class="form-control">
+            <option value="2">2 Minutes (Fast Check-in)</option>
+            <option value="5" selected>5 Minutes (Standard)</option>
+            <option value="10">10 Minutes</option>
+            <option value="15">15 Minutes</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('launchQrModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background: #059669; border-color: #059669;">
+          {% if today_session %}Proceed{% else %}Start & Display QR{% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Add Manual Class Date -->
+<div class="modal-backdrop" id="addDateModal">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h4>Add Class Date to Attendance Sheet</h4>
+      <button type="button" class="modal-close" onclick="closeModal('addDateModal')">&times;</button>
+    </div>
+    <form method="POST" action="{{ url_for('teacher.add_manual_session', batch_id=current_batch.batch_id) }}">
+      <div class="modal-body">
+        <p style="margin-bottom: 14px; font-size: 13px; color: var(--text-secondary);">
+          Add a past or offline class date to the register sheet. You can then mark students present or absent directly using the checkboxes.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Select Date *</label>
+          <input type="date" name="session_date" class="form-control" value="{{ current_date or '' }}" max="{{ current_date or '' }}" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addDateModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Date Column</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toast Feedback Container -->
+<div id="toastContainer" class="toast-container" style="position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;"></div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Batch dropdown menu toggle
+  function toggleBatchMenu() {
+    const menu = document.getElementById('batchDropdownMenu');
+    menu.style.display = (menu.style.display === 'block') ? 'none' : 'block';
+  }
+
+  // Close menus when clicking outside
+  document.addEventListener('click', function(e) {
+    const batchBtn = document.getElementById('batchDropdownBtn');
+    const batchMenu = document.getElementById('batchDropdownMenu');
+    if (batchBtn && batchMenu && !batchBtn.contains(e.target) && !batchMenu.contains(e.target)) {
+      batchMenu.style.display = 'none';
+    }
+
+    // Close any open column dropdown
+    if (!e.target.closest('.date-header-cell')) {
+      document.querySelectorAll('.column-menu').forEach(m => m.style.display = 'none');
+    }
+  });
+
+  // Date Column Dropdown
+  function toggleHeaderMenu(sessionId, event) {
+    event.stopPropagation();
+    const menu = document.getElementById('colMenu' + sessionId);
+    const wasOpen = menu.style.display === 'block';
+    document.querySelectorAll('.column-menu').forEach(m => m.style.display = 'none');
+    if (!wasOpen) {
+      menu.style.display = 'block';
+    }
+  }
+
+  // Filter students instantly by search input
+  function filterStudents() {
+    const query = document.getElementById('studentSearchInput').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.student-row');
+    rows.forEach(row => {
+      const name = row.getAttribute('data-name');
+      const eno = row.getAttribute('data-eno');
+      if (!query || name.includes(query) || eno.includes(query)) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  // Filter by Month
+  function filterMonth(monthVal) {
+    const currentUrl = new URL(window.location.href);
+    if (monthVal === 'all') {
+      currentUrl.searchParams.delete('month');
+    } else {
+      currentUrl.searchParams.set('month', monthVal);
+    }
+    window.location.href = currentUrl.toString();
+  }
+
+  // Real-time AJAX Checkbox Toggle
+  async function handleCheckboxToggle(checkbox, sessionId, studentId, studentName, dateStr) {
+    const isChecked = checkbox.checked;
+    const targetStatus = isChecked ? 'present' : 'absent';
+    const cell = checkbox.closest('td');
+
+    // Visual feedback indicator
+    cell.classList.add('cell-updating');
+
+    try {
+      const response = await fetch('/teacher/api/attendance/toggle', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          student_id: studentId,
+          status: targetStatus
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update row stats badges
+        const pBadge = document.getElementById(`stat-p-${studentId}`);
+        const aBadge = document.getElementById(`stat-a-${studentId}`);
+        const pctBadge = document.getElementById(`stat-pct-${studentId}`);
+
+        if (pBadge) pBadge.textContent = `${data.student_present}P`;
+        if (aBadge) aBadge.textContent = `${data.student_absent}A`;
+        if (pctBadge) {
+          pctBadge.textContent = `${data.student_pct}%`;
+          pctBadge.className = `pct-pill ${data.student_pct >= 75 ? 'high' : (data.student_pct >= 50 ? 'mid' : 'low')}`;
+        }
+
+        // Show Toast
+        showToast(`${studentName}: marked ${isChecked ? 'PRESENT' : 'ABSENT'} for ${dateStr}`, isChecked ? 'success' : 'info');
+      } else {
+        // Revert checkbox state on failure
+        checkbox.checked = !isChecked;
+        showToast(`Failed to update attendance: ${data.error || 'Unknown error'}`, 'danger');
+      }
+    } catch (err) {
+      console.error(err);
+      checkbox.checked = !isChecked;
+      showToast('Network error while updating attendance.', 'danger');
+    } finally {
+      cell.classList.remove('cell-updating');
+    }
+  }
+
+  // Toast notification helper
+  function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast-message toast-${type}`;
+    toast.style.cssText = `
+      background: ${type === 'success' ? '#065f46' : (type === 'danger' ? '#991b1b' : '#1e293b')};
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      animation: fadeIn 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    `;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : (type === 'danger' ? '✗' : 'ℹ')}</span><span>${message}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(8px)';
+      toast.style.transition = 'all 0.3s ease';
+      setTimeout(() => toast.remove(), 300);
+    }, 3000);
+  }
+</script>
+{% endblock %}

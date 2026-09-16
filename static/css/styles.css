@@ -1310,7 +1310,9 @@ body.sidebar-locked {
   }
 
   .receipt-card,
-  .receipt-card * {
+  .receipt-card *,
+  .attendance-matrix-table,
+  .attendance-matrix-table * {
     visibility: visible;
   }
 
@@ -1326,7 +1328,396 @@ body.sidebar-locked {
     border: none;
   }
 
+  .attendance-matrix-table {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
   .no-print {
     display: none !important;
   }
+}
+
+/* =========================================================
+   ATTENDANCE MATRIX SHEET (SPREADSHEET GRID)
+   ========================================================= */
+
+.attendance-sheet-container {
+  width: 100%;
+}
+
+.attendance-matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  background: #ffffff;
+}
+
+/* Green Header Bar Matching Screenshot */
+.matrix-header-row th {
+  background: #15803d; /* Rich forest green */
+  color: #ffffff;
+  padding: 10px 8px;
+  font-weight: 700;
+  text-align: center;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 2px solid #166534;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.matrix-header-row th.sticky-col {
+  background: #166534;
+  z-index: 10;
+}
+
+/* Sticky Left Columns */
+.sticky-col {
+  position: sticky;
+  background: #ffffff;
+  z-index: 2;
+}
+
+.col-sno {
+  left: 0;
+  width: 42px;
+  text-align: center;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.col-name {
+  left: 42px;
+  min-width: 180px;
+  max-width: 220px;
+  border-right: 1px solid var(--border);
+  text-align: left !important;
+  padding-left: 12px !important;
+}
+
+.col-eno {
+  left: 222px;
+  min-width: 110px;
+  border-right: 1px solid var(--border);
+  text-align: center;
+}
+
+.col-stats {
+  left: 332px;
+  min-width: 90px;
+  border-right: 1px solid var(--border);
+  text-align: center;
+}
+
+.col-pct {
+  left: 422px;
+  min-width: 65px;
+  border-right: 2px solid #cbd5e1;
+  box-shadow: 3px 0 5px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+/* Date Columns */
+.matrix-date-col {
+  min-width: 72px;
+  max-width: 84px;
+  text-align: center;
+  position: relative;
+}
+
+.matrix-date-col.col-holiday .date-label {
+  color: #fca5a5 !important;
+}
+
+.matrix-date-col.col-today {
+  background: #047857;
+}
+
+.date-header-cell {
+  position: relative;
+}
+
+.date-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.date-label {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text-red {
+  color: #fca5a5 !important;
+}
+
+.header-dropdown-trigger {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.header-dropdown-trigger:hover {
+  color: #ffffff;
+}
+
+.date-header-sub {
+  font-size: 10.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+}
+
+/* Date Column Menu */
+.column-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-xl);
+  z-index: 100;
+  min-width: 210px;
+  text-align: left;
+  padding: 4px 0;
+  color: var(--text-main);
+}
+
+.column-menu-header {
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.column-menu-item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s;
+  text-decoration: none;
+}
+
+.column-menu-item:hover {
+  background: #f1f5f9;
+  color: var(--text-main);
+}
+
+/* Body Rows & Matrix Cells */
+.student-row {
+  transition: background 0.15s;
+}
+
+.student-row:hover td {
+  background-color: #f8fafc;
+}
+
+.student-row:hover .sticky-col {
+  background-color: #f8fafc;
+}
+
+.attendance-matrix-table td {
+  padding: 7px 6px;
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: middle;
+}
+
+.student-cell-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar-mini {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.st-name {
+  font-size: 12.5px;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eno-badge {
+  font-family: monospace;
+  font-weight: 700;
+  font-size: 11px;
+  background: #f1f5f9;
+  color: var(--primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.badge-present {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 2px 5px;
+  border-radius: 4px;
+  margin-right: 3px;
+}
+
+.badge-absent {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+.pct-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.pct-pill.high {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.pct-pill.mid {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.pct-pill.low {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+/* Custom Styled Checkboxes Matching Screenshot */
+.matrix-cell {
+  text-align: center;
+  padding: 6px !important;
+}
+
+.custom-checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  margin: 0;
+  user-select: none;
+}
+
+.matrix-checkbox {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkbox-checkmark {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  background: #ffffff;
+  border: 1.8px solid #334155;
+  border-radius: 3px;
+  transition: all 0.15s ease-in-out;
+  position: relative;
+}
+
+/* Checked State: Dark/Clean with White Check */
+.matrix-checkbox:checked ~ .checkbox-checkmark {
+  background-color: #1e293b;
+  border-color: #1e293b;
+}
+
+.matrix-checkbox:checked ~ .checkbox-checkmark::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Red Bordered Holiday / Zero Attendance Column Matching Screenshot */
+.holiday-cell .checkbox-checkmark,
+.checkbox-holiday ~ .checkbox-checkmark {
+  border-color: #ef4444;
+}
+
+.checkbox-holiday:checked ~ .checkbox-checkmark {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.matrix-cell:hover .checkbox-checkmark {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+
+.cell-updating {
+  background-color: #fef9c3 !important;
+  transition: background 0.2s;
+}
+
+/* Legend Samples */
+.sheet-checkbox-sample {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.sheet-checkbox-sample.present {
+  color: #1e293b;
+}
+
+.sheet-checkbox-sample.absent {
+  color: #334155;
+}
+
+.sheet-checkbox-sample.holiday {
+  color: #ef4444;
 }

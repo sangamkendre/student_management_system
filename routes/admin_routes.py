@@ -862,6 +862,142 @@ def export_csv():
     response.headers["Content-Disposition"] = f"attachment; filename=attendance_report_{date.today()}.csv"
     return response
 
+@admin_bp.route("/batches/<int:batch_id>/attendance-sheet")
+@admin_required
+def batch_attendance_sheet(batch_id):
+    """Admin view for Batch Attendance Matrix Sheet."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT batch_id, batch_name FROM batches ORDER BY batch_name ASC")
+    all_batches = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT b.*, c.course_name, t.full_name AS teacher_name
+        FROM batches b
+        JOIN courses c ON b.course_id = c.course_id
+        LEFT JOIN teachers t ON b.teacher_id = t.teacher_id
+        WHERE b.batch_id = %s
+    """, (batch_id,))
+    current_batch = cursor.fetchone()
+
+    if not current_batch:
+        cursor.close()
+        conn.close()
+        flash("Batch not found.", "danger")
+        return redirect(url_for("admin.reports"))
+
+    month_filter = request.args.get("month", "all").strip()
+
+    if month_filter and month_filter != "all":
+        cursor.execute("""
+            SELECT s.session_id, s.session_date, s.started_at, s.status,
+                   (SELECT COUNT(*) FROM attendance a WHERE a.session_id = s.session_id AND a.status = 'present') AS present_count
+            FROM attendance_sessions s
+            WHERE s.batch_id = %s AND DATE_FORMAT(s.session_date, '%%Y-%%m') = %s
+            ORDER BY s.session_date ASC, s.started_at ASC
+        """, (batch_id, month_filter))
+    else:
+        cursor.execute("""
+            SELECT s.session_id, s.session_date, s.started_at, s.status,
+                   (SELECT COUNT(*) FROM attendance a WHERE a.session_id = s.session_id AND a.status = 'present') AS present_count
+            FROM attendance_sessions s
+            WHERE s.batch_id = %s
+            ORDER BY s.session_date ASC, s.started_at ASC
+        """, (batch_id,))
+    sessions = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT DISTINCT DATE_FORMAT(session_date, '%%Y-%%m') AS ym,
+                        DATE_FORMAT(session_date, '%%M %%Y') AS ym_label
+        FROM attendance_sessions
+        WHERE batch_id = %s
+        ORDER BY ym DESC
+    """, (batch_id,))
+    available_months = cursor.fetchall()
+
+    cursor.execute("""
+        SELECT s.student_id, s.full_name, s.enrollment_number, s.email, s.phone
+        FROM batch_students bs
+        JOIN students s ON bs.student_id = s.student_id
+        WHERE bs.batch_id = %s AND bs.status IN ('active', 'completed')
+        ORDER BY s.full_name ASC
+    """, (batch_id,))
+    students = cursor.fetchall()
+
+    session_ids = [s["session_id"] for s in sessions]
+    att_matrix = {}
+    for st in students:
+        att_matrix[st["student_id"]] = {}
+
+    if session_ids:
+        format_strings = ','.join(['%s'] * len(session_ids))
+        cursor.execute(f"""
+            SELECT session_id, student_id, status
+            FROM attendance
+            WHERE session_id IN ({format_strings}) AND status = 'present'
+        """, tuple(session_ids))
+        for r in cursor.fetchall():
+            sid = r["student_id"]
+            if sid in att_matrix:
+                att_matrix[sid][r["session_id"]] = "present"
+
+    total_sessions_count = len(sessions)
+    for st in students:
+        sid = st["student_id"]
+        present_count = len(att_matrix.get(sid, {}))
+        absent_count = max(0, total_sessions_count - present_count)
+        pct = round((present_count / total_sessions_count * 100), 1) if total_sessions_count > 0 else 0.0
+        st["present_count"] = present_count
+        st["absent_count"] = absent_count
+        st["attendance_pct"] = pct
+
+    total_students_count = len(students)
+    batch_avg_pct = round(sum(st["attendance_pct"] for st in students) / total_students_count, 1) if total_students_count > 0 else 0.0
+    today = date.today()
+    today_session = next((s for s in sessions if s["session_date"] == today), None)
+
+    cursor.close()
+    conn.close()
+
+    return render_template("teacher/attendance_sheet.html",
+                           batches=all_batches,
+                           current_batch=current_batch,
+                           sessions=sessions,
+                           students=students,
+                           att_matrix=att_matrix,
+                           total_sessions=total_sessions_count,
+                           total_students=total_students_count,
+                           batch_avg_pct=batch_avg_pct,
+                           today_session=today_session,
+                           available_months=available_months,
+                           selected_month=month_filter)
+
+@admin_bp.route("/attendance/session/<int:session_id>/delete", methods=["POST"])
+@admin_required
+def delete_attendance_session(session_id):
+    """Admin endpoint to delete an accidental or unwanted attendance session."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT session_id, batch_id, session_date FROM attendance_sessions WHERE session_id = %s", (session_id,))
+    sess = cursor.fetchone()
+    if not sess:
+        cursor.close()
+        conn.close()
+        flash("Session not found.", "danger")
+        return redirect(url_for("admin.reports"))
+
+    date_str = sess["session_date"].strftime("%d %b %Y") if sess["session_date"] else "Session"
+    cursor.execute("DELETE FROM attendance WHERE session_id = %s", (session_id,))
+    cursor.execute("DELETE FROM attendance_sessions WHERE session_id = %s", (session_id,))
+
+    cursor.close()
+    conn.close()
+
+    flash(f"Attendance session ({date_str}) deleted successfully.", "info")
+    return redirect(request.form.get("next") or request.referrer or url_for("admin.reports"))
+
 
 # ==================== FEES & EMI MANAGEMENT ====================
 

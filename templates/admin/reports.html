@@ -113,6 +113,7 @@
             <th>Presents</th>
             <th>Absents</th>
             <th style="min-width: 180px;">Attendance Rate</th>
+            <th style="text-align: right;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -132,6 +133,11 @@
                   </div>
                   <span class="progress-label">{{ b.attendance_rate }}%</span>
                 </div>
+              </td>
+              <td style="text-align: right;">
+                <a href="{{ url_for('admin.batch_attendance_sheet', batch_id=b.batch_id) }}" class="btn btn-secondary btn-sm" title="View Full Attendance Sheet">
+                  📋 Sheet
+                </a>
               </td>
             </tr>
           {% else %}
@@ -163,6 +169,7 @@
             <th>Teacher</th>
             <th>Turnout</th>
             <th>Status</th>
+            <th style="text-align: right;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -180,6 +187,14 @@
               </td>
               <td>
                 <span class="status-pill {{ s.status }}">{{ s.status }}</span>
+              </td>
+              <td style="text-align: right;">
+                <form method="POST" action="{{ url_for('admin.delete_attendance_session', session_id=s.session_id) }}" 
+                      onsubmit="return confirm('Permanently delete session for {{ s.session_date }}? This will remove this attendance session.');" style="display: inline;">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Delete accidental session">
+                    🗑️ Delete
+                  </button>
+                </form>
               </td>
             </tr>
           {% else %}
