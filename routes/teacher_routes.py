@@ -403,7 +403,7 @@ def add_student_to_batch(batch_id):
 
     elif enroll_type == "new":
         full_name = request.form.get("full_name", "").strip()
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         phone = request.form.get("phone", "").strip()
         enrollment_number = request.form.get("enrollment_number", "").strip()
         password = request.form.get("password", "student123")
@@ -420,7 +420,7 @@ def add_student_to_batch(batch_id):
                 enrollment_number = generate_next_enrollment_number(cursor)
 
             # Check if email exists
-            cursor.execute("SELECT student_id, enrollment_number FROM students WHERE email = %s", (email,))
+            cursor.execute("SELECT student_id, enrollment_number FROM students WHERE LOWER(email) = LOWER(%s)", (email,))
             existing = cursor.fetchone()
             if existing:
                 student_id = existing["student_id"]

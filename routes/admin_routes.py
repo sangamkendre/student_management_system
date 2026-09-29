@@ -114,7 +114,7 @@ def teachers():
 @admin_required
 def add_teacher():
     full_name = request.form.get("full_name", "").strip()
-    email = request.form.get("email", "").strip()
+    email = request.form.get("email", "").strip().lower()
     phone = request.form.get("phone", "").strip()
     password = request.form.get("password", "").strip()
     specialization = request.form.get("specialization", "").strip()
@@ -127,7 +127,7 @@ def add_teacher():
     cursor = conn.cursor()
 
     try:
-        cursor.execute("SELECT teacher_id FROM teachers WHERE email = %s", (email,))
+        cursor.execute("SELECT teacher_id FROM teachers WHERE LOWER(email) = LOWER(%s)", (email,))
         if cursor.fetchone():
             flash("A teacher with this email already exists.", "warning")
         else:
@@ -148,7 +148,7 @@ def add_teacher():
 @admin_required
 def edit_teacher(teacher_id):
     full_name = request.form.get("full_name", "").strip()
-    email = request.form.get("email", "").strip()
+    email = request.form.get("email", "").strip().lower()
     phone = request.form.get("phone", "").strip()
     specialization = request.form.get("specialization", "").strip()
     password = request.form.get("password", "").strip()
@@ -609,7 +609,7 @@ def export_students_csv():
 @admin_required
 def add_student():
     full_name = request.form.get("full_name", "").strip()
-    email = request.form.get("email", "").strip()
+    email = request.form.get("email", "").strip().lower()
     phone = request.form.get("phone", "").strip()
     enrollment_number = request.form.get("enrollment_number", "").strip()
     password = request.form.get("password", "student123").strip()
@@ -622,7 +622,7 @@ def add_student():
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT student_id FROM students WHERE email = %s", (email,))
+        cursor.execute("SELECT student_id FROM students WHERE LOWER(email) = LOWER(%s)", (email,))
         if cursor.fetchone():
             flash("A student with this email already exists.", "warning")
         else:
@@ -654,7 +654,7 @@ def add_student():
 @admin_required
 def edit_student(student_id):
     full_name = request.form.get("full_name", "").strip()
-    email = request.form.get("email", "").strip()
+    email = request.form.get("email", "").strip().lower()
     phone = request.form.get("phone", "").strip()
     enrollment_number = request.form.get("enrollment_number", "").strip()
     status = request.form.get("status", "active")

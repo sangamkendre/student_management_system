@@ -10,7 +10,7 @@ auth = Blueprint("auth", __name__)
 @auth.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
         selected_role = request.form.get("role", "auto").strip()
 
@@ -29,14 +29,14 @@ def login():
 
         for role in roles_to_check:
             if role == "admin":
-                cursor.execute("SELECT admin_id AS id, full_name, email, password FROM admins WHERE email = %s", (email,))
+                cursor.execute("SELECT admin_id AS id, full_name, email, password FROM admins WHERE LOWER(email) = LOWER(%s)", (email,))
                 user = cursor.fetchone()
                 if user and verify_password(password, user["password"]):
                     matched_user = user
                     user_role = "admin"
                     break
             elif role == "teacher":
-                cursor.execute("SELECT teacher_id AS id, full_name, email, password, status FROM teachers WHERE email = %s", (email,))
+                cursor.execute("SELECT teacher_id AS id, full_name, email, password, status FROM teachers WHERE LOWER(email) = LOWER(%s)", (email,))
                 user = cursor.fetchone()
                 if user and verify_password(password, user["password"]):
                     if user["status"] != "active":
@@ -48,7 +48,7 @@ def login():
                     user_role = "teacher"
                     break
             elif role == "student":
-                cursor.execute("SELECT student_id AS id, full_name, email, password, status FROM students WHERE email = %s", (email,))
+                cursor.execute("SELECT student_id AS id, full_name, email, password, status FROM students WHERE LOWER(email) = LOWER(%s)", (email,))
                 user = cursor.fetchone()
                 if user and verify_password(password, user["password"]):
                     if user["status"] != "active":
@@ -125,7 +125,7 @@ def _ensure_password_resets_table(cursor):
 @auth.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
-        email = request.form.get("email", "").strip()
+        email = request.form.get("email", "").strip().lower()
         selected_role = request.form.get("role", "auto").strip()
 
         if not email:
@@ -143,14 +143,14 @@ def forgot_password():
 
         for r in roles_to_check:
             if r == "admin":
-                cursor.execute("SELECT admin_id AS id, full_name, email FROM admins WHERE email = %s", (email,))
+                cursor.execute("SELECT admin_id AS id, full_name, email FROM admins WHERE LOWER(email) = LOWER(%s)", (email,))
                 u = cursor.fetchone()
                 if u:
                     matched_user = u
                     user_role = "admin"
                     break
             elif r == "teacher":
-                cursor.execute("SELECT teacher_id AS id, full_name, email, status FROM teachers WHERE email = %s", (email,))
+                cursor.execute("SELECT teacher_id AS id, full_name, email, status FROM teachers WHERE LOWER(email) = LOWER(%s)", (email,))
                 u = cursor.fetchone()
                 if u:
                     if u.get("status") != "active":
@@ -162,7 +162,7 @@ def forgot_password():
                     user_role = "teacher"
                     break
             elif r == "student":
-                cursor.execute("SELECT student_id AS id, full_name, email, status FROM students WHERE email = %s", (email,))
+                cursor.execute("SELECT student_id AS id, full_name, email, status FROM students WHERE LOWER(email) = LOWER(%s)", (email,))
                 u = cursor.fetchone()
                 if u:
                     if u.get("status") != "active":
@@ -184,7 +184,7 @@ def forgot_password():
         cursor.execute("""
             UPDATE password_resets 
             SET used = 1 
-            WHERE email = %s AND role = %s AND used = 0
+            WHERE LOWER(email) = LOWER(%s) AND role = %s AND used = 0
         """, (email, user_role))
 
         # Generate fresh secure token (30-minute validity)
@@ -253,15 +253,15 @@ def reset_password(token):
     # Retrieve user's name
     user_name = "User"
     if role == "admin":
-        cursor.execute("SELECT full_name FROM admins WHERE email = %s", (email,))
+        cursor.execute("SELECT full_name FROM admins WHERE LOWER(email) = LOWER(%s)", (email,))
         u = cursor.fetchone()
         if u: user_name = u["full_name"]
     elif role == "teacher":
-        cursor.execute("SELECT full_name FROM teachers WHERE email = %s", (email,))
+        cursor.execute("SELECT full_name FROM teachers WHERE LOWER(email) = LOWER(%s)", (email,))
         u = cursor.fetchone()
         if u: user_name = u["full_name"]
     elif role == "student":
-        cursor.execute("SELECT full_name FROM students WHERE email = %s", (email,))
+        cursor.execute("SELECT full_name FROM students WHERE LOWER(email) = LOWER(%s)", (email,))
         u = cursor.fetchone()
         if u: user_name = u["full_name"]
 
@@ -285,11 +285,11 @@ def reset_password(token):
 
         # Update password in role table
         if role == "admin":
-            cursor.execute("UPDATE admins SET password = %s WHERE email = %s", (hashed, email))
+            cursor.execute("UPDATE admins SET password = %s WHERE LOWER(email) = LOWER(%s)", (hashed, email))
         elif role == "teacher":
-            cursor.execute("UPDATE teachers SET password = %s WHERE email = %s", (hashed, email))
+            cursor.execute("UPDATE teachers SET password = %s WHERE LOWER(email) = LOWER(%s)", (hashed, email))
         elif role == "student":
-            cursor.execute("UPDATE students SET password = %s WHERE email = %s", (hashed, email))
+            cursor.execute("UPDATE students SET password = %s WHERE LOWER(email) = LOWER(%s)", (hashed, email))
 
         # Mark token as used
         cursor.execute("UPDATE password_resets SET used = 1 WHERE reset_id = %s", (reset_entry["reset_id"],))
