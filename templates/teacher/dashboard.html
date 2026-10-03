@@ -46,7 +46,31 @@
       <div class="subtext">Completed QR check-ins</div>
     </div>
   </div>
+
+  <div class="metric-card" onclick="window.location.href='{{ url_for('teacher.low_attendance') }}'" style="cursor: pointer; border-left: 4px solid #ef4444;" title="View My Students Below 75% Attendance">
+    <div class="metric-icon rose">⚠️</div>
+    <div class="metric-details">
+      <div class="label">Below 75% Attendance</div>
+      <div class="value" style="color: #dc2626;">{{ low_attendance_count }}</div>
+      <div class="subtext">At-risk students &rarr;</div>
+    </div>
+  </div>
 </div>
+
+{% if low_attendance_count > 0 %}
+<div class="alert alert-warning" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; background: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #f43f5e; border-radius: var(--radius-md); padding: 14px 20px;">
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <span style="font-size: 22px;">⚠️</span>
+    <div>
+      <strong style="color: #9f1239; font-size: 14px;">Attendance Defaulter Warning: {{ low_attendance_count }} student{{ 's' if low_attendance_count != 1 else '' }} in your batches have attendance below 75%</strong>
+      <p style="margin: 2px 0 0 0; font-size: 12.5px; color: #be123c;">Contact students directly or view individual recovery targets before midterm review.</p>
+    </div>
+  </div>
+  <a href="{{ url_for('teacher.low_attendance') }}" class="btn btn-sm" style="background: #e11d48; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 6px 14px;">
+    Review Low Attendance (< 75%) &rarr;
+  </a>
+</div>
+{% endif %}
 
 <!-- Batches Cards Grid -->
 <div class="card">

@@ -77,6 +77,15 @@
         {{ batch_avg_pct }}%
       </div>
     </div>
+    <div class="card" style="padding: 14px 18px; cursor: pointer; border-left: 4px solid {% if low_att_count and low_att_count > 0 %}#ef4444{% else %}#10b981{% endif %};" onclick="toggleLowAttendanceOnly()" title="Click to filter students below 75%">
+      <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Below 75% Attendance</div>
+      <div style="font-size: 24px; font-weight: 800; color: {% if low_att_count and low_att_count > 0 %}#dc2626{% else %}#059669{% endif %}; margin-top: 4px;">
+        <span id="lowAttCountDisplay">{{ low_att_count or 0 }}</span>
+      </div>
+      <div style="font-size: 11.5px; color: {% if low_att_count and low_att_count > 0 %}#dc2626{% else %}#059669{% endif %}; margin-top: 2px;">
+        {% if low_att_count and low_att_count > 0 %}⚠️ Click to filter defaulters{% else %}✓ All compliant{% endif %}
+      </div>
+    </div>
     <div class="card" style="padding: 14px 18px;">
       <div style="font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Today's Session</div>
       <div style="font-size: 18px; font-weight: 700; margin-top: 6px;">
@@ -92,11 +101,20 @@
   <!-- Filter & Search Bar -->
   <div class="card" style="margin-bottom: 14px; padding: 12px 18px;">
     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-      <!-- Student Search -->
-      <div style="display: flex; align-items: center; gap: 8px; flex: 1; max-width: 380px;">
-        <span style="color: var(--text-muted); font-size: 14px;">🔍</span>
-        <input type="text" id="studentSearchInput" placeholder="Filter student by name or enrollment number..." 
-               class="form-control" style="font-size: 13px; padding: 6px 12px; height: 36px;" oninput="filterStudents()">
+      <!-- Student Search & Defaulter Toggle -->
+      <div style="display: flex; align-items: center; gap: 10px; flex: 1; max-width: 560px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex: 1;">
+          <span style="color: var(--text-muted); font-size: 14px;">🔍</span>
+          <input type="text" id="studentSearchInput" placeholder="Filter student by name or enrollment number..." 
+                 class="form-control" style="font-size: 13px; padding: 6px 12px; height: 36px;" oninput="applySheetFilters()">
+        </div>
+        <button type="button" id="btnFilterLowAtt" class="btn btn-secondary btn-sm" onclick="toggleLowAttendanceOnly()" 
+                style="height: 36px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
+          <span>⚠️ < 75% Only</span>
+          <span class="badge" id="badgeLowAttCount" style="background: #fee2e2; color: #b91c1c; font-weight: 800; padding: 2px 6px; border-radius: 6px; font-size: 11px;">
+            {{ low_att_count or 0 }}
+          </span>
+        </button>
       </div>
 
       <!-- Month Filter -->
@@ -201,7 +219,12 @@
         </thead>
         <tbody id="matrixTbody">
           {% for st in students %}
-            <tr class="student-row" id="srow-{{ st.student_id }}" data-name="{{ st.full_name|lower }}" data-eno="{{ (st.enrollment_number or '')|lower }}">
+            {% set is_defaulter = (total_sessions > 0 and st.attendance_pct < 75.0) %}
+            <tr class="student-row" id="srow-{{ st.student_id }}" 
+                data-name="{{ st.full_name|lower }}" 
+                data-eno="{{ (st.enrollment_number or '')|lower }}"
+                data-pct="{{ st.attendance_pct }}"
+                data-defaulter="{{ 'true' if is_defaulter else 'false' }}">
               <!-- Sticky Left Columns -->
               <td class="sticky-col col-sno">{{ loop.index }}</td>
               <td class="sticky-col col-name">
@@ -372,19 +395,47 @@
     }
   }
 
-  // Filter students instantly by search input
-  function filterStudents() {
-    const query = document.getElementById('studentSearchInput').value.toLowerCase().trim();
+  let showOnlyLowAtt = false;
+
+  function toggleLowAttendanceOnly() {
+    showOnlyLowAtt = !showOnlyLowAtt;
+    const btn = document.getElementById('btnFilterLowAtt');
+    if (btn) {
+      if (showOnlyLowAtt) {
+        btn.className = 'btn btn-primary btn-sm';
+        btn.style.background = '#e11d48';
+        btn.style.borderColor = '#e11d48';
+      } else {
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+      }
+    }
+    applySheetFilters();
+  }
+
+  // Filter students instantly by search input & low attendance toggle
+  function applySheetFilters() {
+    const query = (document.getElementById('studentSearchInput').value || '').toLowerCase().trim();
     const rows = document.querySelectorAll('.student-row');
     rows.forEach(row => {
-      const name = row.getAttribute('data-name');
-      const eno = row.getAttribute('data-eno');
-      if (!query || name.includes(query) || eno.includes(query)) {
+      const name = row.getAttribute('data-name') || '';
+      const eno = row.getAttribute('data-eno') || '';
+      const isDefaulter = row.getAttribute('data-defaulter') === 'true';
+
+      const matchesText = !query || name.includes(query) || eno.includes(query);
+      const matchesDefaulter = !showOnlyLowAtt || isDefaulter;
+
+      if (matchesText && matchesDefaulter) {
         row.style.display = '';
       } else {
         row.style.display = 'none';
       }
     });
+  }
+
+  function filterStudents() {
+    applySheetFilters();
   }
 
   // Filter by Month

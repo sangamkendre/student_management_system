@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+
+{% block page_title %}Students Below 75% Attendance (Defaulters Alert){% endblock %}
+
+{% block content %}
+<!-- Page Header Banner -->
+<div style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); border-radius: var(--radius-lg); padding: 24px 28px; color: #ffffff; margin-bottom: 24px; box-shadow: 0 10px 25px rgba(30, 27, 75, 0.25); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+  <div>
+    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(248, 113, 113, 0.4); padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; color: #fca5a5; margin-bottom: 8px;">
+      <span>⚠️ Defaulters Tracking</span>
+      <span>&bull;</span>
+      <span>75% Compliance Threshold</span>
+    </div>
+    <h2 style="color: #ffffff; font-size: 22px; margin-bottom: 4px;">Low Attendance (< 75%) Monitor</h2>
+    <p style="color: #c7d2fe; font-size: 13.5px; margin: 0;">
+      Official institute monitoring of students at risk of attendance shortage across all active batches and courses.
+    </p>
+  </div>
+  <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+    <a href="{{ url_for('admin.export_low_attendance_csv', search=filter_search, batch_id=filter_batch, course_id=filter_course, teacher_id=filter_teacher, level=filter_level) }}" 
+       class="btn btn-primary" style="background: #10b981; border-color: #10b981;">
+      <svg style="width: 15px; height: 15px; margin-right: 6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      <span>Export Defaulters CSV</span>
+    </a>
+    <a href="{{ url_for('admin.reports') }}" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: #ffffff; border-color: rgba(255,255,255,0.3);">
+      📊 General Reports
+    </a>
+  </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="metrics-grid">
+  <div class="metric-card" style="border-left: 4px solid #ef4444;">
+    <div class="metric-icon rose">⚠️</div>
+    <div class="metric-details">
+      <div class="label">Total Below 75%</div>
+      <div class="value" style="color: #dc2626;">{{ total_count }}</div>
+      <div class="subtext">Students in attendance deficit</div>
+    </div>
+  </div>
+
+  <div class="metric-card" style="border-left: 4px solid #b91c1c;">
+    <div class="metric-icon rose">🚨</div>
+    <div class="metric-details">
+      <div class="label">Critical (< 50%)</div>
+      <div class="value" style="color: #991b1b;">{{ critical_count }}</div>
+      <div class="subtext">Severe attendance shortage</div>
+    </div>
+  </div>
+
+  <div class="metric-card" style="border-left: 4px solid #f59e0b;">
+    <div class="metric-icon amber">⏳</div>
+    <div class="metric-details">
+      <div class="label">Moderate (50% - 74%)</div>
+      <div class="value" style="color: #d97706;">{{ warning_count }}</div>
+      <div class="subtext">Borderline attendance standing</div>
+    </div>
+  </div>
+
+  <div class="metric-card" style="border-left: 4px solid #6366f1;">
+    <div class="metric-icon purple">👥</div>
+    <div class="metric-details">
+      <div class="label">Batches Affected</div>
+      <div class="value">{{ batches_affected }}</div>
+      <div class="subtext">Cohorts with low attendance</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters Toolbar -->
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-body" style="padding: 18px 24px;">
+    <form method="GET" action="{{ url_for('admin.low_attendance') }}" style="display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end;">
+      
+      <!-- Student Live Search -->
+      <div style="flex: 1.2; min-width: 220px;">
+        <label class="form-label" style="font-size: 12px; font-weight: 600;">Search Student</label>
+        <div style="position: relative;">
+          <input type="text" id="defaulterSearchInput" name="search" class="form-control" 
+                 placeholder="Search by student name, enrollment, phone, email..." 
+                 value="{{ filter_search or '' }}" 
+                 style="padding: 8px 12px; font-size: 13px;" oninput="filterDefaultersClientSide()">
+        </div>
+      </div>
+
+      <!-- Course Filter -->
+      <div style="flex: 1; min-width: 160px;">
+        <label class="form-label" style="font-size: 12px; font-weight: 600;">Course</label>
+        <select name="course_id" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="">All Courses</option>
+          {% for c in courses %}
+            <option value="{{ c.course_id }}" {% if filter_course|string == c.course_id|string %}selected{% endif %}>{{ c.course_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Batch Filter -->
+      <div style="flex: 1; min-width: 160px;">
+        <label class="form-label" style="font-size: 12px; font-weight: 600;">Batch</label>
+        <select name="batch_id" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="">All Batches</option>
+          {% for b in batches %}
+            <option value="{{ b.batch_id }}" {% if filter_batch|string == b.batch_id|string %}selected{% endif %}>{{ b.batch_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Teacher Filter -->
+      <div style="flex: 1; min-width: 160px;">
+        <label class="form-label" style="font-size: 12px; font-weight: 600;">Teacher</label>
+        <select name="teacher_id" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="">All Teachers</option>
+          {% for t in teachers %}
+            <option value="{{ t.teacher_id }}" {% if filter_teacher|string == t.teacher_id|string %}selected{% endif %}>{{ t.full_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Shortage Level Filter -->
+      <div style="width: 160px;">
+        <label class="form-label" style="font-size: 12px; font-weight: 600;">Severity Level</label>
+        <select name="level" class="form-control" style="padding: 8px 12px; font-size: 13px;">
+          <option value="all" {% if filter_level == 'all' or not filter_level %}selected{% endif %}>All Defaulters (< 75%)</option>
+          <option value="critical" {% if filter_level == 'critical' %}selected{% endif %}>Critical (< 50%)</option>
+          <option value="warning" {% if filter_level == 'warning' %}selected{% endif %}>Moderate (50% - 74%)</option>
+        </select>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display: flex; gap: 8px;">
+        <button type="submit" class="btn btn-primary btn-sm" style="height: 38px;">Apply</button>
+        <a href="{{ url_for('admin.low_attendance') }}" class="btn btn-secondary btn-sm" style="height: 38px;">Reset</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<!-- Defaulters Table Card -->
+<div class="card">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+    <div>
+      <h3 style="display: flex; align-items: center; gap: 8px;">
+        <span>Defaulters List (< 75% Attendance)</span>
+        <span class="badge" id="defaulterCountBadge" style="background: #fee2e2; color: #b91c1c; font-size: 13px; font-weight: 700; padding: 3px 10px; border-radius: 12px;">
+          {{ total_count }} student{{ 's' if total_count != 1 else '' }}
+        </span>
+      </h3>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
+        Sorted from lowest attendance percentage to highest. Click phone/email to follow up.
+      </p>
+    </div>
+  </div>
+
+  <div class="card-body" style="padding: 0;">
+    <div class="table-responsive">
+      <table class="custom-table" id="defaultersTable">
+        <thead>
+          <tr>
+            <th style="width: 45px;">#</th>
+            <th>Student Name</th>
+            <th>Enrollment No</th>
+            <th>Batch & Course</th>
+            <th>Instructor</th>
+            <th style="text-align: center;">Attended / Total</th>
+            <th style="min-width: 170px;">Attendance %</th>
+            <th>Status & Shortage Recovery</th>
+            <th>Quick Contact</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="defaultersTbody">
+          {% for d in defaulters %}
+            <tr class="defaulter-row" 
+                data-name="{{ d.full_name|lower }}" 
+                data-eno="{{ (d.enrollment_number or '')|lower }}" 
+                data-phone="{{ (d.phone or '')|lower }}" 
+                data-email="{{ d.email|lower }}"
+                data-batch="{{ d.batch_name|lower }}">
+              <td style="color: var(--text-muted); font-size: 12px;">{{ loop.index }}</td>
+              
+              <!-- Student Info -->
+              <td>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="width: 34px; height: 34px; border-radius: 50%; background: {% if d.severity == 'critical' %}#fee2e2; color: #b91c1c;{% else %}#fef3c7; color: #b45309;{% endif %} display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; flex-shrink: 0;">
+                    {{ d.full_name[0]|upper }}
+                  </div>
+                  <div>
+                    <strong style="color: var(--text-main); font-size: 13.5px;">{{ d.full_name }}</strong>
+                    <div style="font-size: 11.5px; color: var(--text-muted);">{{ d.email }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Enrollment Number -->
+              <td>
+                <span style="font-family: monospace; font-size: 12px; font-weight: 700; color: var(--primary); background: #eef2ff; padding: 2px 7px; border-radius: 4px;">
+                  {{ d.enrollment_number or 'UNASSIGNED' }}
+                </span>
+              </td>
+
+              <!-- Batch & Course -->
+              <td>
+                <strong style="font-size: 13px; color: var(--text-main);">{{ d.batch_name }}</strong>
+                <div style="font-size: 11.5px; color: var(--text-muted);">{{ d.course_name }}</div>
+              </td>
+
+              <!-- Teacher -->
+              <td>
+                <span style="font-size: 13px; color: var(--text-secondary);">{{ d.teacher_name or 'Unassigned' }}</span>
+              </td>
+
+              <!-- Attended / Total & Absent -->
+              <td style="text-align: center;">
+                <div style="font-weight: 700; font-size: 14px;">
+                  <span style="color: {% if d.severity == 'critical' %}#dc2626{% else %}#d97706{% endif %};">{{ d.present_count }}</span>
+                  <span style="color: var(--text-muted); font-weight: normal;"> / {{ d.total_sessions }}</span>
+                </div>
+                <div style="font-size: 11px; color: #dc2626;">{{ d.absent_count }} Missed</div>
+              </td>
+
+              <!-- Attendance Percentage & Progress Bar -->
+              <td>
+                <div class="progress-container">
+                  <div class="progress-bar-bg" style="height: 8px;">
+                    <div class="progress-bar-fill {% if d.severity == 'critical' %}low{% else %}mid{% endif %}" style="width: {{ d.attendance_pct }}%;"></div>
+                  </div>
+                  <span class="pct-pill {% if d.severity == 'critical' %}low{% else %}mid{% endif %}" style="font-size: 12px; font-weight: 800;">
+                    {{ d.attendance_pct }}%
+                  </span>
+                </div>
+              </td>
+
+              <!-- Status & Classes Needed -->
+              <td>
+                {% if d.severity == 'critical' %}
+                  <div style="display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+                    🚨 Critical Shortage
+                  </div>
+                {% else %}
+                  <div style="display: inline-flex; align-items: center; gap: 4px; background: #fffbeb; color: #92400e; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-bottom: 4px;">
+                    ⚠️ Shortage Warning
+                  </div>
+                {% endif %}
+                <div style="font-size: 11.5px; color: var(--text-muted);">
+                  Must attend next <strong style="color: var(--primary);">{{ d.classes_needed }}</strong> class{{ 'es' if d.classes_needed != 1 else '' }} to reach 75%
+                </div>
+              </td>
+
+              <!-- Quick Contact -->
+              <td>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  {% if d.phone %}
+                    <a href="tel:{{ d.phone }}" class="btn btn-secondary btn-sm" title="Call Student ({{ d.phone }})" style="padding: 4px 8px; font-size: 12px;">
+                      📞 Call
+                    </a>
+                    {% if d.whatsapp_phone %}
+                      <a href="https://wa.me/{{ d.whatsapp_phone }}?text=Hello%20{{ d.full_name }},%20this%20is%20regarding%20your%20low%20attendance%20({{ d.attendance_pct }}%)%20in%20{{ d.batch_name }}." 
+                         target="_blank" class="btn btn-sm" title="Message on WhatsApp" 
+                         style="background: #25d366; color: white; border-color: #25d366; padding: 4px 8px; font-size: 12px;">
+                        💬 WA
+                      </a>
+                    {% endif %}
+                  {% else %}
+                    <span style="font-size: 11.5px; color: var(--text-muted); font-style: italic;">No Phone</span>
+                  {% endif %}
+                  <a href="mailto:{{ d.email }}?subject=Attendance%20Shortage%20Alert%20-%20{{ d.batch_name }}&body=Dear%20{{ d.full_name }},%0A%0AYour%20current%20attendance%20in%20{{ d.batch_name }}%20is%20{{ d.attendance_pct }}%%20({{ d.present_count }}/{{ d.total_sessions }}%20classes%20attended),%20which%20is%20below%20the%20mandatory%2075%%%20threshold.%20Please%20ensure%20regular%20attendance%20moving%20forward." 
+                     class="btn btn-secondary btn-sm" title="Send Attendance Email" style="padding: 4px 8px; font-size: 12px;">
+                    ✉️
+                  </a>
+                </div>
+              </td>
+
+              <!-- Action -->
+              <td style="text-align: right;">
+                <a href="{{ url_for('admin.batch_attendance_sheet', batch_id=d.batch_id) }}" class="btn btn-secondary btn-sm" title="View Full Batch Attendance Matrix Sheet">
+                  📋 Sheet
+                </a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 48px;">
+                <div style="font-size: 36px; margin-bottom: 8px;">🎉</div>
+                <h4 style="font-size: 16px; color: var(--text-main); margin-bottom: 4px;">No Students Below 75% Attendance!</h4>
+                <p style="font-size: 13px; color: var(--text-muted); margin: 0;">
+                  All enrolled students in the selected filter criteria maintain 75% or higher attendance compliance.
+                </p>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function filterDefaultersClientSide() {
+  const query = (document.getElementById('defaulterSearchInput').value || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('#defaultersTbody tr.defaulter-row');
+  let visibleCount = 0;
+
+  rows.forEach(row => {
+    const name = row.getAttribute('data-name') || '';
+    const eno = row.getAttribute('data-eno') || '';
+    const phone = row.getAttribute('data-phone') || '';
+    const email = row.getAttribute('data-email') || '';
+    const batch = row.getAttribute('data-batch') || '';
+
+    const match = !query || name.includes(query) || eno.includes(query) || phone.includes(query) || email.includes(query) || batch.includes(query);
+    if (match) {
+      row.style.display = '';
+      visibleCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+
+  const countBadge = document.getElementById('defaulterCountBadge');
+  if (countBadge) {
+    countBadge.textContent = `${visibleCount} student${visibleCount !== 1 ? 's' : ''}`;
+  }
+}
+</script>
+{% endblock %}

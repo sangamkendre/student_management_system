@@ -67,11 +67,16 @@
 <div class="card">
   <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
     <h3>Enrolled Students ({{ students|length }})</h3>
-    <div style="position: relative; width: 100%; max-width: 320px;">
-      <svg style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-      </svg>
-      <input type="text" id="rosterSearchInput" class="form-control" placeholder="Search by name or contact number..." style="padding-left: 32px; padding-top: 6px; padding-bottom: 6px; font-size: 13px;" oninput="filterRosterLive()">
+    <div style="display: flex; align-items: center; gap: 10px; width: 100%; max-width: 480px;">
+      <div style="position: relative; flex: 1;">
+        <svg style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-muted);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="rosterSearchInput" class="form-control" placeholder="Search by name or contact number..." style="padding-left: 32px; padding-top: 6px; padding-bottom: 6px; font-size: 13px;" oninput="filterRosterLive()">
+      </div>
+      <button type="button" id="rosterLowAttBtn" class="btn btn-secondary btn-sm" onclick="toggleRosterLowAttendance()" style="height: 35px; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+        <span>⚠️ < 75% Only</span>
+      </button>
     </div>
   </div>
   <div class="card-body" style="padding: 0;">
@@ -91,7 +96,13 @@
         </thead>
         <tbody>
           {% for s in students %}
-            <tr class="roster-row" data-name="{{ s.full_name|lower }}" data-phone="{{ (s.phone or '')|lower }}" data-eno="{{ (s.enrollment_number or '')|lower }}" data-email="{{ s.email|lower }}">
+            {% set is_defaulter = (total_batch_sessions > 0 and s.attendance_pct < 75.0) %}
+            <tr class="roster-row" 
+                data-name="{{ s.full_name|lower }}" 
+                data-phone="{{ (s.phone or '')|lower }}" 
+                data-eno="{{ (s.enrollment_number or '')|lower }}" 
+                data-email="{{ s.email|lower }}"
+                data-defaulter="{{ 'true' if is_defaulter else 'false' }}">
               <td>
                 <span style="font-family: monospace; font-weight: 700; color: var(--primary); background: #eef2ff; padding: 2px 7px; border-radius: 4px; font-size: 12.5px;">
                   {{ s.enrollment_number or 'UNASSIGNED' }}
@@ -290,8 +301,27 @@
       });
   }
 
+  let showOnlyLowAttRoster = false;
+
+  function toggleRosterLowAttendance() {
+    showOnlyLowAttRoster = !showOnlyLowAttRoster;
+    const btn = document.getElementById('rosterLowAttBtn');
+    if (btn) {
+      if (showOnlyLowAttRoster) {
+        btn.className = 'btn btn-primary btn-sm';
+        btn.style.background = '#e11d48';
+        btn.style.borderColor = '#e11d48';
+      } else {
+        btn.className = 'btn btn-secondary btn-sm';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+      }
+    }
+    filterRosterLive();
+  }
+
   function filterRosterLive() {
-    const query = document.getElementById('rosterSearchInput').value.toLowerCase().trim();
+    const query = (document.getElementById('rosterSearchInput').value || '').toLowerCase().trim();
     const rows = document.querySelectorAll('.roster-row');
     const noMatch = document.getElementById('noRosterMatchRow');
     let visibleCount = 0;
@@ -301,8 +331,12 @@
       const phone = row.getAttribute('data-phone') || '';
       const eno = row.getAttribute('data-eno') || '';
       const email = row.getAttribute('data-email') || '';
+      const isDefaulter = row.getAttribute('data-defaulter') === 'true';
 
-      if (!query || name.includes(query) || phone.includes(query) || eno.includes(query) || email.includes(query)) {
+      const textMatches = !query || name.includes(query) || phone.includes(query) || eno.includes(query) || email.includes(query);
+      const defaulterMatches = !showOnlyLowAttRoster || isDefaulter;
+
+      if (textMatches && defaulterMatches) {
         row.style.display = '';
         visibleCount++;
       } else {

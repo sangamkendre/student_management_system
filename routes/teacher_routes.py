@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from utils.db import get_db_connection
 from utils.auth_helpers import teacher_required, hash_password, generate_next_enrollment_number, verify_password
 from utils.qr_generator import generate_qr_base64
+from utils.attendance_helpers import get_low_attendance_records, get_low_attendance_count
 
 teacher_bp = Blueprint("teacher", __name__, url_prefix="/teacher")
 
@@ -68,13 +69,16 @@ def dashboard():
     cursor.close()
     conn.close()
 
+    low_attendance_count = get_low_attendance_count(teacher_id=teacher_id)
+
     return render_template("teacher/dashboard.html",
                            teacher=teacher,
                            batches=batches,
                            total_batches=len(batches),
                            total_students=total_students,
                            total_sessions=total_sessions,
-                           recent_sessions=recent_sessions)
+                           recent_sessions=recent_sessions,
+                           low_attendance_count=low_attendance_count)
 
 @teacher_bp.route("/batches")
 @teacher_required
@@ -852,7 +856,7 @@ def batch_reports(batch_id):
 
     # Student-wise attendance
     cursor.execute("""
-        SELECT s.student_id, s.full_name, s.enrollment_number, s.email,
+        SELECT s.student_id, s.full_name, s.enrollment_number, s.email, s.phone,
                (SELECT COUNT(*) FROM attendance a 
                 JOIN attendance_sessions ses ON a.session_id = ses.session_id 
                 WHERE ses.batch_id = %s AND a.student_id = s.student_id AND a.status = 'present') AS present_count
@@ -863,11 +867,20 @@ def batch_reports(batch_id):
     """, (batch_id, batch_id))
     student_stats = cursor.fetchall()
 
+    low_attendance_students = []
     for st in student_stats:
         p = st["present_count"]
         a = max(0, total_sessions - p)
         st["absent_count"] = a
         st["attendance_pct"] = round((p / total_sessions * 100), 2) if total_sessions > 0 else 0.0
+
+        if total_sessions > 0 and st["attendance_pct"] < 75.0:
+            st["classes_needed"] = max(0, 3 * total_sessions - 4 * p)
+            st["severity"] = "critical" if st["attendance_pct"] < 50.0 else "warning"
+            raw_phone = (st.get("phone") or "").strip()
+            clean_digits = "".join(ch for ch in raw_phone if ch.isdigit())
+            st["whatsapp_phone"] = clean_digits if len(clean_digits) >= 10 else None
+            low_attendance_students.append(st)
 
     cursor.close()
     conn.close()
@@ -876,7 +889,122 @@ def batch_reports(batch_id):
                            batch=batch,
                            sessions=sessions,
                            student_stats=student_stats,
+                           low_attendance_students=low_attendance_students,
                            total_sessions=total_sessions)
+
+# ==================== LOW ATTENDANCE (< 75%) MANAGEMENT ====================
+
+@teacher_bp.route("/attendance/low-attendance")
+@teacher_required
+def low_attendance():
+    """Teacher view for students with attendance below 75% in their assigned batches."""
+    teacher_id = get_teacher_id()
+    search_query = request.args.get("search", "").strip()
+    batch_filter = request.args.get("batch_id", "").strip()
+    shortage_level = request.args.get("level", "all").strip().lower()
+
+    b_id = int(batch_filter) if batch_filter and batch_filter.isdigit() else None
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT batch_id, batch_name 
+        FROM batches 
+        WHERE teacher_id = %s 
+        ORDER BY batch_name ASC
+    """, (teacher_id,))
+    batches = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    data = get_low_attendance_records(
+        teacher_id=teacher_id,
+        batch_id=b_id,
+        search_query=search_query,
+        shortage_level=shortage_level,
+        threshold=75.0
+    )
+
+    return render_template("teacher/low_attendance.html",
+                           defaulters=data["defaulters"],
+                           total_count=data["total_count"],
+                           critical_count=data["critical_count"],
+                           warning_count=data["warning_count"],
+                           batches_affected=data["batches_affected"],
+                           batches=batches,
+                           filter_search=search_query,
+                           filter_batch=batch_filter,
+                           filter_level=shortage_level)
+
+
+@teacher_bp.route("/attendance/low-attendance/export-csv")
+@teacher_required
+def export_low_attendance_csv():
+    """Export low attendance (<75%) students in teacher's batches as CSV."""
+    teacher_id = get_teacher_id()
+    search_query = request.args.get("search", "").strip()
+    batch_filter = request.args.get("batch_id", "").strip()
+    shortage_level = request.args.get("level", "all").strip().lower()
+
+    b_id = int(batch_filter) if batch_filter and batch_filter.isdigit() else None
+
+    data = get_low_attendance_records(
+        teacher_id=teacher_id,
+        batch_id=b_id,
+        search_query=search_query,
+        shortage_level=shortage_level,
+        threshold=75.0
+    )
+
+    output = io.StringIO()
+    output.write('\ufeff')  # UTF-8 BOM for Microsoft Excel
+    writer = csv.writer(output)
+
+    writer.writerow(["TEACHER BATCH ATTENDANCE SHORTAGE REPORT (BELOW 75%)"])
+    writer.writerow(["Exported On", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow(["Total Defaulters", data["total_count"]])
+    writer.writerow(["Critical (<50%)", data["critical_count"]])
+    writer.writerow(["Warning (50-74%)", data["warning_count"]])
+    writer.writerow([])
+
+    writer.writerow([
+        "S.No",
+        "Student Name",
+        "Enrollment Number",
+        "Batch",
+        "Course",
+        "Classes Attended",
+        "Total Classes",
+        "Absent Classes",
+        "Attendance %",
+        "Severity",
+        "Classes Needed to Reach 75%",
+        "Contact Phone",
+        "Email Address"
+    ])
+
+    for idx, d in enumerate(data["defaulters"], start=1):
+        writer.writerow([
+            idx,
+            d["full_name"],
+            d["enrollment_number"] or "N/A",
+            d["batch_name"],
+            d["course_name"],
+            d["present_count"],
+            d["total_sessions"],
+            d["absent_count"],
+            f"{d['attendance_pct']}%",
+            d["severity"].upper(),
+            d["classes_needed"],
+            d["phone"] or "N/A",
+            d["email"]
+        ])
+
+    response = Response(output.getvalue(), mimetype="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename=my_students_below_75_percent_{date.today()}.csv"
+    return response
 
 @teacher_bp.route("/attendance-sheet")
 @teacher_bp.route("/batches/<int:batch_id>/attendance-sheet")
@@ -998,6 +1126,8 @@ def attendance_sheet(batch_id=None):
     today = date.today()
     today_session = next((s for s in sessions if s["session_date"] == today), None)
 
+    low_att_count = sum(1 for st in students if st["attendance_pct"] < 75.0)
+
     cursor.close()
     conn.close()
 
@@ -1012,7 +1142,8 @@ def attendance_sheet(batch_id=None):
                            batch_avg_pct=batch_avg_pct,
                            today_session=today_session,
                            available_months=available_months,
-                           selected_month=month_filter)
+                           selected_month=month_filter,
+                           low_att_count=low_att_count)
 
 @teacher_bp.route("/api/attendance/toggle", methods=["POST"])
 @teacher_required

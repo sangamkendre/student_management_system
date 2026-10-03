@@ -1356,8 +1356,16 @@ body.sidebar-locked {
   background: #ffffff;
 }
 
-/* Green Header Bar Matching Screenshot */
+/* Green Header Bar Matching Screenshot - Frozen on scroll */
+.attendance-matrix-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 .matrix-header-row th {
+  position: sticky;
+  top: 0;
   background: #15803d; /* Rich forest green */
   color: #ffffff;
   padding: 10px 8px;
@@ -1365,20 +1373,29 @@ body.sidebar-locked {
   text-align: center;
   border-right: 1px solid rgba(255, 255, 255, 0.2);
   border-bottom: 2px solid #166534;
+  box-shadow: inset 0 -2px 0 #166534;
   white-space: nowrap;
   user-select: none;
-}
-
-.matrix-header-row th.sticky-col {
-  background: #166534;
   z-index: 10;
 }
 
-/* Sticky Left Columns */
+/* Corner sticky columns (sticky to both top: 0 and left offset) */
+.matrix-header-row th.sticky-col {
+  position: sticky;
+  top: 0;
+  background: #166534 !important;
+  z-index: 30; /* Highest priority: stays above scrolling date headers and body sticky cols */
+}
+
+.matrix-header-row th.col-pct {
+  box-shadow: 3px 0 5px rgba(0, 0, 0, 0.08), inset 0 -2px 0 #166534;
+}
+
+/* Sticky Left Columns in Body */
 .sticky-col {
   position: sticky;
   background: #ffffff;
-  z-index: 2;
+  z-index: 5;
 }
 
 .col-sno {
@@ -1421,12 +1438,19 @@ body.sidebar-locked {
   text-align: center;
 }
 
-/* Date Columns */
+/* Date Columns - Frozen Sticky Top Header */
 .matrix-date-col {
+  position: sticky;
+  top: 0;
   min-width: 72px;
   max-width: 84px;
   text-align: center;
-  position: relative;
+  z-index: 10;
+  background: #15803d;
+}
+
+.matrix-date-col.col-holiday {
+  background: #15803d;
 }
 
 .matrix-date-col.col-holiday .date-label {
@@ -1435,6 +1459,34 @@ body.sidebar-locked {
 
 .matrix-date-col.col-today {
   background: #047857;
+}
+
+.sheet-scroll-container {
+  max-height: 680px;
+  overflow-x: auto;
+  overflow-y: auto;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f8fafc;
+}
+
+.sheet-scroll-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sheet-scroll-container::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.sheet-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.sheet-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .date-header-cell {

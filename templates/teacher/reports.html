@@ -27,34 +27,67 @@
   </div>
 </div>
 
-<!-- Student-Wise Attendance Overview (Matching Prompt specification) -->
+{% if low_attendance_students %}
+<!-- Batch Low Attendance Warning Banner -->
+<div class="alert alert-warning" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; background: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #f43f5e; border-radius: var(--radius-md); padding: 14px 20px;">
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <span style="font-size: 22px;">⚠️</span>
+    <div>
+      <strong style="color: #9f1239; font-size: 14px;">
+        {{ low_attendance_students|length }} student{{ 's' if low_attendance_students|length != 1 else '' }} in this batch below 75% attendance threshold
+      </strong>
+      <p style="margin: 2px 0 0 0; font-size: 12.5px; color: #be123c;">
+        These students risk falling short of the academic eligibility criteria. Use the quick contact actions below to alert them.
+      </p>
+    </div>
+  </div>
+  <button type="button" class="btn btn-sm" onclick="filterReportStudents('defaulters')" style="background: #e11d48; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 6px 14px;">
+    Show {{ low_attendance_students|length }} Defaulters Only &darr;
+  </button>
+</div>
+{% endif %}
+
+<!-- Student-Wise Attendance Overview -->
 <div class="card">
-  <div class="card-header">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
     <div>
       <h3>Student-Wise Attendance Summary</h3>
       <p style="font-size: 13px; color: var(--text-muted); margin-top: 2px;">
         Individual student breakdown across all {{ total_sessions }} sessions.
       </p>
     </div>
+    
+    <!-- Filter Tabs (All vs Below 75% Only) -->
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button type="button" id="tabAllStudents" class="btn btn-primary btn-sm" onclick="filterReportStudents('all')" style="height: 34px;">
+        All Students ({{ student_stats|length }})
+      </button>
+      <button type="button" id="tabDefaulters" class="btn btn-secondary btn-sm" onclick="filterReportStudents('defaulters')" style="height: 34px; color: {% if low_attendance_students %}#dc2626; font-weight: 700;{% else %}var(--text-muted);{% endif %}">
+        ⚠️ Below 75% Only ({{ low_attendance_students|length }})
+      </button>
+    </div>
   </div>
   <div class="card-body" style="padding: 0;">
     <div class="table-responsive">
-      <table class="custom-table">
+      <table class="custom-table" id="reportStudentsTable">
         <thead>
           <tr>
             <th>Student Name</th>
             <th>Enrollment No</th>
-            <th>Present Days</th>
-            <th>Absent Days</th>
-            <th style="min-width: 220px;">Attendance Percentage</th>
+            <th style="text-align: center;">Present</th>
+            <th style="text-align: center;">Absent</th>
+            <th style="min-width: 180px;">Attendance %</th>
+            <th>Compliance Status</th>
+            <th style="text-align: right;">Contact</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="reportStudentsTbody">
           {% for s in student_stats %}
-            <tr>
+            {% set is_defaulter = (total_sessions > 0 and s.attendance_pct < 75.0) %}
+            <tr class="report-student-row" data-defaulter="{{ 'true' if is_defaulter else 'false' }}">
               <td>
                 <div style="display: flex; align-items: center; gap: 10px;">
-                  <div style="width: 32px; height: 32px; border-radius: 50%; background: #e0e7ff; color: #4338ca; display: flex; align-items: center; justify-content: center; font-weight: bold;">
+                  <div style="width: 32px; height: 32px; border-radius: 50%; background: {% if is_defaulter %}#fee2e2; color: #b91c1c;{% else %}#e0e7ff; color: #4338ca;{% endif %} display: flex; align-items: center; justify-content: center; font-weight: bold;">
                     {{ s.full_name[0]|upper }}
                   </div>
                   <div>
@@ -68,29 +101,105 @@
                   {{ s.enrollment_number or 'N/A' }}
                 </span>
               </td>
-              <td><strong style="color: #059669; font-size: 15px;">{{ s.present_count }}</strong></td>
-              <td><strong style="color: #dc2626; font-size: 15px;">{{ s.absent_count }}</strong></td>
+              <td style="text-align: center;"><strong style="color: #059669; font-size: 14px;">{{ s.present_count }}</strong></td>
+              <td style="text-align: center;"><strong style="color: #dc2626; font-size: 14px;">{{ s.absent_count }}</strong></td>
               <td>
                 <div class="progress-container">
                   <div class="progress-bar-bg">
-                    <div class="progress-bar-fill {% if s.attendance_pct >= 80 %}high{% elif s.attendance_pct >= 60 %}mid{% else %}low{% endif %}" style="width: {{ s.attendance_pct }}%;"></div>
+                    <div class="progress-bar-fill {% if s.attendance_pct >= 75 %}high{% elif s.attendance_pct >= 50 %}mid{% else %}low{% endif %}" style="width: {{ s.attendance_pct }}%;"></div>
                   </div>
-                  <span class="progress-label" style="font-size: 14px;">{{ s.attendance_pct }}%</span>
+                  <span class="pct-pill {% if s.attendance_pct >= 75 %}high{% elif s.attendance_pct >= 50 %}mid{% else %}low{% endif %}" style="font-size: 13px;">
+                    {{ s.attendance_pct }}%
+                  </span>
+                </div>
+              </td>
+              <td>
+                {% if total_sessions == 0 %}
+                  <span style="font-size: 12px; color: var(--text-muted); font-style: italic;">No sessions yet</span>
+                {% elif is_defaulter %}
+                  <span style="display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #b91c1c; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+                    ⚠️ Below 75%
+                  </span>
+                  {% if s.classes_needed %}
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                      Needs next <strong>{{ s.classes_needed }}</strong> classes
+                    </div>
+                  {% endif %}
+                {% else %}
+                  <span style="display: inline-flex; align-items: center; gap: 4px; background: #dcfce7; color: #15803d; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 6px;">
+                    ✓ Compliant (≥75%)
+                  </span>
+                {% endif %}
+              </td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; align-items: center; gap: 4px;">
+                  {% if s.phone %}
+                    <a href="tel:{{ s.phone }}" class="btn btn-secondary btn-sm" title="Call ({{ s.phone }})" style="padding: 3px 7px; font-size: 11.5px;">
+                      📞
+                    </a>
+                    {% if s.whatsapp_phone %}
+                      <a href="https://wa.me/{{ s.whatsapp_phone }}?text=Hello%20{{ s.full_name }},%20this%20is%20regarding%20your%20attendance%20({{ s.attendance_pct }}%)%20in%20{{ batch.batch_name }}." 
+                         target="_blank" class="btn btn-sm" title="WhatsApp" 
+                         style="background: #25d366; color: white; border-color: #25d366; padding: 3px 7px; font-size: 11.5px;">
+                        💬
+                      </a>
+                    {% endif %}
+                  {% endif %}
+                  <a href="mailto:{{ s.email }}?subject=Attendance%20Status%20-%20{{ batch.batch_name }}" class="btn btn-secondary btn-sm" title="Email Student" style="padding: 3px 7px; font-size: 11.5px;">
+                    ✉️
+                  </a>
                 </div>
               </td>
             </tr>
           {% else %}
             <tr>
-              <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 36px;">
+              <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">
                 No enrolled students found for this batch.
               </td>
             </tr>
           {% endfor %}
+          <tr id="noDefaultersRow" style="display: none;">
+            <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;">
+              🎉 No students in this batch currently have attendance below 75%!
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+<script>
+function filterReportStudents(mode) {
+  const rows = document.querySelectorAll('#reportStudentsTbody tr.report-student-row');
+  const tabAll = document.getElementById('tabAllStudents');
+  const tabDef = document.getElementById('tabDefaulters');
+  const noDefRow = document.getElementById('noDefaultersRow');
+  let visibleDefaulters = 0;
+
+  if (mode === 'defaulters') {
+    tabAll.className = 'btn btn-secondary btn-sm';
+    tabDef.className = 'btn btn-primary btn-sm';
+    rows.forEach(r => {
+      const isDef = r.getAttribute('data-defaulter') === 'true';
+      if (isDef) {
+        r.style.display = '';
+        visibleDefaulters++;
+      } else {
+        r.style.display = 'none';
+      }
+    });
+    if (noDefRow) noDefRow.style.display = (visibleDefaulters === 0) ? '' : 'none';
+  } else {
+    tabAll.className = 'btn btn-primary btn-sm';
+    tabDef.className = 'btn btn-secondary btn-sm';
+    rows.forEach(r => {
+      r.style.display = '';
+    });
+    if (noDefRow) noDefRow.style.display = 'none';
+  }
+}
+</script>
 
 <!-- Session History Table -->
 <div class="card">

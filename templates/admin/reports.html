@@ -56,6 +56,26 @@
   </div>
 </div>
 
+<!-- Low Attendance (< 75%) Alert Banner -->
+{% if low_attendance_count > 0 %}
+<div style="background: #fff1f2; border: 1px solid #fecdd3; border-left: 4px solid #e11d48; border-radius: var(--radius-md); padding: 14px 20px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <span style="font-size: 24px;">⚠️</span>
+    <div>
+      <h4 style="margin: 0; color: #9f1239; font-size: 14.5px; font-weight: 700;">
+        Low Attendance Alert: {{ low_attendance_count }} student{{ 's' if low_attendance_count != 1 else '' }} below 75% threshold
+      </h4>
+      <p style="margin: 2px 0 0 0; color: #be123c; font-size: 12.5px;">
+        Identify attendance shortage defaulters, calculate recovery classes needed, and export parent notices.
+      </p>
+    </div>
+  </div>
+  <a href="{{ url_for('admin.low_attendance') }}" class="btn btn-sm" style="background: #e11d48; color: #ffffff; font-weight: 700; padding: 7px 16px;">
+    View Defaulters List (< 75%) &rarr;
+  </a>
+</div>
+{% endif %}
+
 <!-- Aggregated Statistics -->
 <div class="metrics-grid">
   <div class="metric-card">
@@ -91,6 +111,15 @@
       <div class="label">Overall Attendance</div>
       <div class="value">{{ overall_rate }}%</div>
       <div class="subtext">Institute-wide average</div>
+    </div>
+  </div>
+
+  <div class="metric-card" onclick="window.location.href='{{ url_for('admin.low_attendance') }}'" style="cursor: pointer; border-left: 4px solid #ef4444;" title="View Students with Attendance < 75%">
+    <div class="metric-icon rose">⚠️</div>
+    <div class="metric-details">
+      <div class="label">Below 75% Attendance</div>
+      <div class="value" style="color: #dc2626;">{{ low_attendance_count }}</div>
+      <div class="subtext">At-risk defaulters &rarr;</div>
     </div>
   </div>
 </div>

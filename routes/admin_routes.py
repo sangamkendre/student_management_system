@@ -8,6 +8,7 @@ from utils.fees_db import (
     ensure_fees_tables, get_fees_summary, get_all_fees, get_fee_details,
     create_student_fee, record_fee_payment, get_payment_receipt, delete_student_fee
 )
+from utils.attendance_helpers import get_low_attendance_records, get_low_attendance_count
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -78,6 +79,7 @@ def dashboard():
 
 
     fees_summary = get_fees_summary()
+    low_attendance_count = get_low_attendance_count()
 
     return render_template("admin/dashboard.html",
                            total_students=total_students,
@@ -88,7 +90,8 @@ def dashboard():
                            today_sessions=today_sessions,
                            recent_batches=recent_batches,
                            recent_sessions=recent_sessions,
-                           fees_summary=fees_summary)
+                           fees_summary=fees_summary,
+                           low_attendance_count=low_attendance_count)
 
 # ==================== TEACHERS MANAGEMENT ====================
 
@@ -806,6 +809,8 @@ def reports():
     cursor.close()
     conn.close()
 
+    low_attendance_count = get_low_attendance_count()
+
     return render_template("admin/reports.html",
                            courses=courses,
                            batches=batches,
@@ -819,7 +824,8 @@ def reports():
                            total_possible=total_possible_attendances,
                            total_presents=total_marked_presents,
                            total_absents=total_marked_absents,
-                           overall_rate=overall_rate)
+                           overall_rate=overall_rate,
+                           low_attendance_count=low_attendance_count)
 
 @admin_bp.route("/reports/export-csv")
 @admin_required
@@ -860,6 +866,135 @@ def export_csv():
 
     response = Response(output.getvalue(), mimetype="text/csv")
     response.headers["Content-Disposition"] = f"attachment; filename=attendance_report_{date.today()}.csv"
+    return response
+
+# ==================== LOW ATTENDANCE (< 75%) MANAGEMENT ====================
+
+@admin_bp.route("/attendance/low-attendance")
+@admin_required
+def low_attendance():
+    """Admin view for students with attendance below 75% (Defaulters Alert)."""
+    search_query = request.args.get("search", "").strip()
+    batch_filter = request.args.get("batch_id", "").strip()
+    course_filter = request.args.get("course_id", "").strip()
+    teacher_filter = request.args.get("teacher_id", "").strip()
+    shortage_level = request.args.get("level", "all").strip().lower()
+
+    b_id = int(batch_filter) if batch_filter and batch_filter.isdigit() else None
+    c_id = int(course_filter) if course_filter and course_filter.isdigit() else None
+    t_id = int(teacher_filter) if teacher_filter and teacher_filter.isdigit() else None
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT course_id, course_name FROM courses ORDER BY course_name ASC")
+    courses = cursor.fetchall()
+
+    cursor.execute("SELECT batch_id, batch_name FROM batches ORDER BY batch_name ASC")
+    batches = cursor.fetchall()
+
+    cursor.execute("SELECT teacher_id, full_name FROM teachers ORDER BY full_name ASC")
+    teachers = cursor.fetchall()
+
+    cursor.close()
+    conn.close()
+
+    data = get_low_attendance_records(
+        batch_id=b_id,
+        course_id=c_id,
+        teacher_id=t_id,
+        search_query=search_query,
+        shortage_level=shortage_level,
+        threshold=75.0
+    )
+
+    return render_template("admin/low_attendance.html",
+                           defaulters=data["defaulters"],
+                           total_count=data["total_count"],
+                           critical_count=data["critical_count"],
+                           warning_count=data["warning_count"],
+                           batches_affected=data["batches_affected"],
+                           courses=courses,
+                           batches=batches,
+                           teachers=teachers,
+                           filter_search=search_query,
+                           filter_batch=batch_filter,
+                           filter_course=course_filter,
+                           filter_teacher=teacher_filter,
+                           filter_level=shortage_level)
+
+
+@admin_bp.route("/attendance/low-attendance/export-csv")
+@admin_required
+def export_low_attendance_csv():
+    """Export low attendance (<75%) student records as CSV for Admin."""
+    search_query = request.args.get("search", "").strip()
+    batch_filter = request.args.get("batch_id", "").strip()
+    course_filter = request.args.get("course_id", "").strip()
+    teacher_filter = request.args.get("teacher_id", "").strip()
+    shortage_level = request.args.get("level", "all").strip().lower()
+
+    b_id = int(batch_filter) if batch_filter and batch_filter.isdigit() else None
+    c_id = int(course_filter) if course_filter and course_filter.isdigit() else None
+    t_id = int(teacher_filter) if teacher_filter and teacher_filter.isdigit() else None
+
+    data = get_low_attendance_records(
+        batch_id=b_id,
+        course_id=c_id,
+        teacher_id=t_id,
+        search_query=search_query,
+        shortage_level=shortage_level,
+        threshold=75.0
+    )
+
+    output = io.StringIO()
+    output.write('\ufeff')  # UTF-8 BOM for Microsoft Excel
+    writer = csv.writer(output)
+
+    writer.writerow(["ATTENDANCE SHORTAGE REPORT (BELOW 75%)"])
+    writer.writerow(["Exported On", datetime.now().strftime("%Y-%m-%d %H:%M:%S")])
+    writer.writerow(["Total Defaulters", data["total_count"]])
+    writer.writerow(["Critical (<50%)", data["critical_count"]])
+    writer.writerow(["Warning (50-74%)", data["warning_count"]])
+    writer.writerow([])
+
+    writer.writerow([
+        "S.No",
+        "Student Name",
+        "Enrollment Number",
+        "Course",
+        "Batch",
+        "Teacher",
+        "Classes Attended",
+        "Total Classes",
+        "Absent Classes",
+        "Attendance %",
+        "Severity",
+        "Classes Needed to Reach 75%",
+        "Contact Number",
+        "Email Address"
+    ])
+
+    for idx, d in enumerate(data["defaulters"], start=1):
+        writer.writerow([
+            idx,
+            d["full_name"],
+            d["enrollment_number"] or "N/A",
+            d["course_name"],
+            d["batch_name"],
+            d["teacher_name"] or "Unassigned",
+            d["present_count"],
+            d["total_sessions"],
+            d["absent_count"],
+            f"{d['attendance_pct']}%",
+            d["severity"].upper(),
+            d["classes_needed"],
+            d["phone"] or "N/A",
+            d["email"]
+        ])
+
+    response = Response(output.getvalue(), mimetype="text/csv")
+    response.headers["Content-Disposition"] = f"attachment; filename=low_attendance_defaulters_{date.today()}.csv"
     return response
 
 @admin_bp.route("/batches/<int:batch_id>/attendance-sheet")
@@ -963,6 +1098,8 @@ def batch_attendance_sheet(batch_id):
     today = date.today()
     today_session = next((s for s in sessions if s["session_date"] == today), None)
 
+    low_att_count = sum(1 for st in students if st["attendance_pct"] < 75.0)
+
     cursor.close()
     conn.close()
 
@@ -977,7 +1114,8 @@ def batch_attendance_sheet(batch_id):
                            batch_avg_pct=batch_avg_pct,
                            today_session=today_session,
                            available_months=available_months,
-                           selected_month=month_filter)
+                           selected_month=month_filter,
+                           low_att_count=low_att_count)
 
 @admin_bp.route("/attendance/session/<int:session_id>/delete", methods=["POST"])
 @admin_required
