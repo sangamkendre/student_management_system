@@ -256,7 +256,7 @@
                 <td class="matrix-cell {% if is_empty_col %}holiday-cell{% endif %}" 
                     data-student-id="{{ st.student_id }}" 
                     data-session-id="{{ ses.session_id }}">
-                  <label class="custom-checkbox-wrapper">
+                  <label class="custom-checkbox-wrapper" title="{{ st.full_name }} &bull; {{ ses.session_date.strftime('%d %b') }}">
                     <input type="checkbox" 
                            class="matrix-checkbox {% if is_empty_col %}checkbox-holiday{% endif %}" 
                            data-student-id="{{ st.student_id }}" 
@@ -449,14 +449,22 @@
     window.location.href = currentUrl.toString();
   }
 
-  // Real-time AJAX Checkbox Toggle
+  // Real-time AJAX Checkbox Toggle with Row Glow & Highlight
   async function handleCheckboxToggle(checkbox, sessionId, studentId, studentName, dateStr) {
     const isChecked = checkbox.checked;
     const targetStatus = isChecked ? 'present' : 'absent';
     const cell = checkbox.closest('td');
+    const row = document.getElementById(`srow-${studentId}`);
 
-    // Visual feedback indicator
+    // Visual feedback indicator on cell
     cell.classList.add('cell-updating');
+
+    // Immediate student name row glow / highlight while request is in flight
+    if (row) {
+      if (row._glowTimer) clearTimeout(row._glowTimer);
+      row.classList.remove('row-glow-present', 'row-glow-absent', 'row-glow-error');
+      row.classList.add('row-marking');
+    }
 
     try {
       const response = await fetch('/teacher/api/attendance/toggle', {
@@ -474,16 +482,46 @@
       const data = await response.json();
 
       if (data.success) {
-        // Update row stats badges
+        // Update row stats badges with dynamic pop animation
         const pBadge = document.getElementById(`stat-p-${studentId}`);
         const aBadge = document.getElementById(`stat-a-${studentId}`);
         const pctBadge = document.getElementById(`stat-pct-${studentId}`);
 
-        if (pBadge) pBadge.textContent = `${data.student_present}P`;
-        if (aBadge) aBadge.textContent = `${data.student_absent}A`;
+        if (pBadge) {
+          pBadge.textContent = `${data.student_present}P`;
+          if (isChecked) {
+            pBadge.classList.remove('bump');
+            void pBadge.offsetWidth;
+            pBadge.classList.add('bump');
+          }
+        }
+        if (aBadge) {
+          aBadge.textContent = `${data.student_absent}A`;
+          if (!isChecked) {
+            aBadge.classList.remove('bump');
+            void aBadge.offsetWidth;
+            aBadge.classList.add('bump');
+          }
+        }
         if (pctBadge) {
           pctBadge.textContent = `${data.student_pct}%`;
           pctBadge.className = `pct-pill ${data.student_pct >= 75 ? 'high' : (data.student_pct >= 50 ? 'mid' : 'low')}`;
+          pctBadge.classList.remove('bump');
+          void pctBadge.offsetWidth;
+          pctBadge.classList.add('bump');
+        }
+
+        // Update student row data attributes & defaulter tracking
+        if (row) {
+          row.setAttribute('data-pct', data.student_pct);
+          row.setAttribute('data-defaulter', data.student_pct < 75.0 ? 'true' : 'false');
+
+          // Transition to confirmed vibrant glow highlight for the student name row
+          row.classList.remove('row-marking');
+          row.classList.add(isChecked ? 'row-glow-present' : 'row-glow-absent');
+          row._glowTimer = setTimeout(() => {
+            row.classList.remove('row-glow-present', 'row-glow-absent');
+          }, 3000);
         }
 
         // Show Toast
@@ -491,11 +529,25 @@
       } else {
         // Revert checkbox state on failure
         checkbox.checked = !isChecked;
+        if (row) {
+          row.classList.remove('row-marking');
+          row.classList.add('row-glow-error');
+          row._glowTimer = setTimeout(() => {
+            row.classList.remove('row-glow-error');
+          }, 2500);
+        }
         showToast(`Failed to update attendance: ${data.error || 'Unknown error'}`, 'danger');
       }
     } catch (err) {
       console.error(err);
       checkbox.checked = !isChecked;
+      if (row) {
+        row.classList.remove('row-marking');
+        row.classList.add('row-glow-error');
+        row._glowTimer = setTimeout(() => {
+          row.classList.remove('row-glow-error');
+        }, 2500);
+      }
       showToast('Network error while updating attendance.', 'danger');
     } finally {
       cell.classList.remove('cell-updating');
@@ -530,5 +582,26 @@
       setTimeout(() => toast.remove(), 300);
     }, 3000);
   }
+
+  // Spreadsheet Crosshair: Highlight Date Header on Cell Hover
+  document.addEventListener('DOMContentLoaded', function() {
+    const matrixCells = document.querySelectorAll('.matrix-cell');
+    matrixCells.forEach(cell => {
+      cell.addEventListener('mouseenter', function() {
+        const sesId = this.getAttribute('data-session-id');
+        if (sesId) {
+          const colHeader = document.querySelector(`th.matrix-date-col[data-session-id="${sesId}"]`);
+          if (colHeader) colHeader.classList.add('col-header-active');
+        }
+      });
+      cell.addEventListener('mouseleave', function() {
+        const sesId = this.getAttribute('data-session-id');
+        if (sesId) {
+          const colHeader = document.querySelector(`th.matrix-date-col[data-session-id="${sesId}"]`);
+          if (colHeader) colHeader.classList.remove('col-header-active');
+        }
+      });
+    });
+  });
 </script>
 {% endblock %}
