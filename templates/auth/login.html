@@ -84,6 +84,29 @@
       color: #0f172a;
       box-shadow: 0 2px 5px rgba(0,0,0,0.08);
     }
+    .password-wrapper {
+      position: relative;
+    }
+    .toggle-password {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 15px;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      user-select: none;
+    }
+    .toggle-password:hover {
+      color: #475569;
+    }
 
     @media (max-width: 480px) {
       body {
@@ -146,7 +169,10 @@
           <label class="form-label" for="password" style="margin-bottom: 0;">Password</label>
           <a href="{{ url_for('auth.forgot_password') }}" style="font-size: 12.5px; color: var(--primary); text-decoration: none; font-weight: 600;">Forgot Password?</a>
         </div>
-        <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+        <div class="password-wrapper">
+          <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required style="padding-right: 40px;">
+          <button type="button" class="toggle-password" onclick="toggleVisibility('password', this)" title="Show/hide password" aria-label="Toggle password visibility">👁️</button>
+        </div>
       </div>
 
       <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; margin-top: 10px;">
@@ -167,6 +193,17 @@
       document.getElementById('roleInput').value = role;
       document.querySelectorAll('.role-tab-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+    }
+
+    function toggleVisibility(id, btn) {
+      const input = document.getElementById(id);
+      if (input.type === 'password') {
+        input.type = 'text';
+        btn.textContent = '🙈';
+      } else {
+        input.type = 'password';
+        btn.textContent = '👁️';
+      }
     }
   </script>
 </body>
