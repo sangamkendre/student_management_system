@@ -220,11 +220,11 @@ def forgot_password():
         session["reset_email"] = email
         session["reset_role"] = user_role
 
-        if email_result.get("simulated"):
-            session["simulated_otp"] = otp
-            flash(f"OTP generated for {email} (Running in development fallback mode).", "info")
+        if not email_result.get("sent"):
+            err_msg = email_result.get("error") or "Please check your SMTP settings."
+            flash(f"Failed to send verification email: {err_msg}", "danger")
         else:
-            flash(f"A 6-digit OTP verification code has been sent to {email}.", "success")
+            flash(f"A 6-digit OTP verification code has been sent to your email ({email}).", "success")
 
         return redirect(url_for("auth.verify_otp", token=reset_token))
 
@@ -272,8 +272,6 @@ def verify_otp():
         u = cursor.fetchone()
         if u: user_name = u["full_name"]
 
-    simulated_otp = session.get("simulated_otp")
-
     if request.method == "POST":
         submitted_otp = request.form.get("otp", "").strip()
         new_password = request.form.get("password", "").strip()
@@ -300,8 +298,7 @@ def verify_otp():
                                    email=email,
                                    role=role,
                                    user_name=user_name,
-                                   submitted_otp=submitted_otp,
-                                   simulated_otp=simulated_otp)
+                                   submitted_otp=submitted_otp)
 
         if not new_password or not confirm_password:
             cursor.close()
@@ -312,8 +309,7 @@ def verify_otp():
                                    email=email,
                                    role=role,
                                    user_name=user_name,
-                                   submitted_otp=submitted_otp,
-                                   simulated_otp=simulated_otp)
+                                   submitted_otp=submitted_otp)
 
         if len(new_password) < 6:
             cursor.close()
@@ -324,8 +320,7 @@ def verify_otp():
                                    email=email,
                                    role=role,
                                    user_name=user_name,
-                                   submitted_otp=submitted_otp,
-                                   simulated_otp=simulated_otp)
+                                   submitted_otp=submitted_otp)
 
         if new_password != confirm_password:
             cursor.close()
@@ -336,8 +331,7 @@ def verify_otp():
                                    email=email,
                                    role=role,
                                    user_name=user_name,
-                                   submitted_otp=submitted_otp,
-                                   simulated_otp=simulated_otp)
+                                   submitted_otp=submitted_otp)
 
         hashed = hash_password(new_password)
 
@@ -356,7 +350,6 @@ def verify_otp():
         session.pop("reset_token", None)
         session.pop("reset_email", None)
         session.pop("reset_role", None)
-        session.pop("simulated_otp", None)
 
         flash(f"Password for {email} ({role.title()}) has been reset successfully! Please log in with your new password.", "success")
         return redirect(url_for("auth.login"))
@@ -368,8 +361,7 @@ def verify_otp():
                            token=token,
                            email=email,
                            role=role,
-                           user_name=user_name,
-                           simulated_otp=simulated_otp)
+                           user_name=user_name)
 
 @auth.route("/resend-otp", methods=["POST"])
 def resend_otp():
@@ -437,10 +429,12 @@ def resend_otp():
     session["reset_email"] = email
     session["reset_role"] = role
 
-    if email_result.get("simulated"):
-        session["simulated_otp"] = new_otp
+    if not email_result.get("sent"):
+        err_msg = email_result.get("error") or "Please check your SMTP settings."
+        flash(f"Failed to resend OTP: {err_msg}", "danger")
+    else:
+        flash("A fresh 6-digit OTP has been sent to your email.", "info")
 
-    flash("A fresh 6-digit OTP has been sent to your email.", "info")
     return redirect(url_for("auth.verify_otp", token=new_token))
 
 @auth.route("/reset-password/<token>", methods=["GET", "POST"])

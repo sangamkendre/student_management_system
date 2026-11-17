@@ -1,32 +1,40 @@
+import os
 import smtplib
 from email.message import EmailMessage
 import logging
+from dotenv import load_dotenv
 from config import Config
 
 logger = logging.getLogger(__name__)
 
 def send_password_reset_otp(to_email: str, user_name: str, role: str, otp: str, reset_url: str = None) -> dict:
     """
-    Sends a 6-digit password reset OTP email to a user (admin, teacher, or student).
-    Delivers via SMTP if configured in Config. Otherwise, uses development simulation mode.
+    Sends a 6-digit password reset OTP email to a user (admin, teacher, or student)
+    via SMTP.
     
     Returns a dictionary:
       {
         "sent": bool,           # True if delivered via SMTP
-        "simulated": bool,      # True if development fallback used
-        "otp": str,             # 6-digit OTP code
-        "reset_url": str or None,
         "error": str or None    # Error message if SMTP delivery failed
       }
     """
+    # Ensure latest environment variables are loaded
+    load_dotenv(override=True)
+
     role_title = role.title() if role else "User"
     subject = f"EduManage - Password Reset OTP: {otp}"
 
-    sender_email = Config.MAIL_DEFAULT_SENDER or Config.MAIL_USERNAME or "noreply@edumanage.com"
-    if "<" in sender_email:
-        sender = sender_email
+    mail_server = os.getenv("MAIL_SERVER") or Config.MAIL_SERVER or "smtp-relay.brevo.com"
+    mail_port = int(os.getenv("MAIL_PORT") or Config.MAIL_PORT or 587)
+    mail_use_tls = os.getenv("MAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
+    mail_username = os.getenv("MAIL_USERNAME") or Config.MAIL_USERNAME or ""
+    mail_password = os.getenv("MAIL_PASSWORD") or Config.MAIL_PASSWORD or ""
+    mail_sender = os.getenv("MAIL_DEFAULT_SENDER") or Config.MAIL_DEFAULT_SENDER or mail_username or "noreply@edumanage.com"
+
+    if "<" in mail_sender:
+        sender = mail_sender
     else:
-        sender = f"EduManage Portal <{sender_email}>"
+        sender = f"EduManage Portal <{mail_sender}>"
 
     # Plain text version
     text_body = f"""Hello {user_name},
@@ -88,7 +96,7 @@ EduManage Administration Team
     <div class="content">
       <span class="role-badge">{role_title} Account</span>
       <p style="font-size: 16px; margin-top: 4px;">Hello <strong>{user_name}</strong>,</p>
-      <p>We received a request to reset your password for your account linked to <strong>{to_email}</strong>.</p>
+      <p>We received a request to reset the password for your account linked to <strong>{to_email}</strong>.</p>
       
       <div class="otp-box">
         <div class="otp-label">Your Verification Code (OTP)</div>
@@ -114,63 +122,43 @@ EduManage Administration Team
 </html>
 """
 
-    has_credentials = bool(Config.MAIL_USERNAME and Config.MAIL_PASSWORD)
-
-    if has_credentials:
-        try:
-            msg = EmailMessage()
-            msg["Subject"] = subject
-            msg["From"] = sender
-            msg["To"] = to_email
-            msg.set_content(text_body)
-            msg.add_alternative(html_body, subtype="html")
-
-            server = smtplib.SMTP(Config.MAIL_SERVER, Config.MAIL_PORT, timeout=12)
-            if Config.MAIL_USE_TLS:
-                server.starttls()
-            server.login(Config.MAIL_USERNAME, Config.MAIL_PASSWORD)
-            server.send_message(msg)
-            server.quit()
-
-            logger.info(f"Password reset OTP sent to {to_email} via SMTP ({Config.MAIL_SERVER}).")
-            return {
-                "sent": True,
-                "simulated": False,
-                "otp": otp,
-                "reset_url": reset_url,
-                "error": None
-            }
-        except Exception as e:
-            logger.warning(f"SMTP delivery failed to {to_email}: {e}. Falling back to simulation mode.")
-            print(f"\n[DEVELOPMENT FALLBACK] Reset OTP for {to_email} ({role}): {otp} (Error: {e})\n")
-            return {
-                "sent": False,
-                "simulated": True,
-                "otp": otp,
-                "reset_url": reset_url,
-                "error": str(e)
-            }
-    else:
-        # Development simulation mode
-        logger.info(f"[SIMULATED OTP] Password reset requested for {to_email} ({role}). OTP: {otp}")
-        print(f"\n========================================================")
-        print(f"[SIMULATED PASSWORD RESET OTP]")
-        print(f"To: {to_email} ({user_name} - {role_title})")
-        print(f"OTP: {otp}")
-        if reset_url:
-            print(f"Verification Page: {reset_url}")
-        print(f"========================================================\n")
+    if not mail_username or not mail_password:
+        logger.error("SMTP credentials (MAIL_USERNAME / MAIL_PASSWORD) are not set in .env")
         return {
             "sent": False,
-            "simulated": True,
-            "otp": otp,
-            "reset_url": reset_url,
+            "error": "SMTP credentials (MAIL_USERNAME / MAIL_PASSWORD) are missing in .env."
+        }
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = sender
+        msg["To"] = to_email
+        msg.set_content(text_body)
+        msg.add_alternative(html_body, subtype="html")
+
+        server = smtplib.SMTP(mail_server, mail_port, timeout=12)
+        if mail_use_tls:
+            server.starttls()
+        server.login(mail_username, mail_password)
+        server.send_message(msg)
+        server.quit()
+
+        logger.info(f"Password reset OTP sent to {to_email} via SMTP ({mail_server}).")
+        return {
+            "sent": True,
             "error": None
+        }
+    except Exception as e:
+        logger.error(f"SMTP delivery failed to {to_email}: {e}")
+        return {
+            "sent": False,
+            "error": str(e)
         }
 
 def send_password_reset_email(to_email: str, user_name: str, role: str, reset_token: str, host_url: str) -> dict:
     """
-    Backwards-compatible wrapper. Generates or passes token via link while sending email.
+    Backwards-compatible wrapper.
     """
     base_url = host_url.rstrip("/")
     reset_url = f"{base_url}/verify-otp?token={reset_token}"

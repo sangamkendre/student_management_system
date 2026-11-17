@@ -112,22 +112,6 @@
       box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
       outline: none;
     }
-    .simulated-card {
-      background: #fefce8;
-      border: 1px dashed #ca8a04;
-      border-radius: 10px;
-      padding: 14px 16px;
-      margin-bottom: 20px;
-      font-size: 13px;
-      color: #854d0e;
-      text-align: center;
-    }
-    .simulated-card strong {
-      font-size: 18px;
-      letter-spacing: 3px;
-      color: #713f12;
-      font-family: monospace;
-    }
     .resend-box {
       margin-top: 20px;
       padding-top: 16px;
@@ -183,13 +167,6 @@
         </div>
       {% endif %}
     {% endwith %}
-
-    {% if simulated_otp %}
-      <div class="simulated-card">
-        <div>🔑 <strong>Development Mode:</strong></div>
-        <div style="margin-top: 4px;">Your verification OTP is <strong>{{ simulated_otp }}</strong></div>
-      </div>
-    {% endif %}
 
     <form method="POST" action="{{ url_for('auth.verify_otp') }}" onsubmit="return validatePasswords()">
       <input type="hidden" name="token" value="{{ token }}">
