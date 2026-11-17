@@ -18,15 +18,17 @@ def send_password_reset_otp(to_email: str, user_name: str, role: str, otp: str, 
         "error": str or None    # Error message if SMTP delivery failed
       }
     """
-    # Ensure latest environment variables are loaded
-    load_dotenv(override=True)
+    # Ensure latest environment variables are loaded using absolute path
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    dotenv_path = os.path.join(base_dir, ".env")
+    load_dotenv(dotenv_path, override=True)
 
     role_title = role.title() if role else "User"
     subject = f"EduManage - Password Reset OTP: {otp}"
 
     mail_server = os.getenv("MAIL_SERVER") or Config.MAIL_SERVER or "smtp-relay.brevo.com"
     mail_port = int(os.getenv("MAIL_PORT") or Config.MAIL_PORT or 587)
-    mail_use_tls = os.getenv("MAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
+    mail_use_tls = str(os.getenv("MAIL_USE_TLS", Config.MAIL_USE_TLS)).lower() in ("true", "1", "yes")
     mail_username = os.getenv("MAIL_USERNAME") or Config.MAIL_USERNAME or ""
     mail_password = os.getenv("MAIL_PASSWORD") or Config.MAIL_PASSWORD or ""
     mail_sender = os.getenv("MAIL_DEFAULT_SENDER") or Config.MAIL_DEFAULT_SENDER or mail_username or "noreply@edumanage.com"

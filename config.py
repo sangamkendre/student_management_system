@@ -1,7 +1,9 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+dotenv_path = os.path.join(BASE_DIR, ".env")
+load_dotenv(dotenv_path, override=True)
 
 class Config:
 
@@ -18,9 +20,9 @@ class Config:
     )
 
     # Email / SMTP Configuration
-    MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp-relay.brevo.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
-    MAIL_USE_TLS = os.getenv("MAIL_USE_TLS", "True").lower() in ("true", "1", "yes")
+    MAIL_USE_TLS = str(os.getenv("MAIL_USE_TLS", "True")).lower() in ("true", "1", "yes")
     MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
-    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "noreply@edumanage.com")
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "")
