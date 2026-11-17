@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block page_title %}System Activity & Audit Logs{% endblock %}
+
+{% block content %}
+<!-- KPI Metric Cards -->
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="metric-icon indigo">📋</div>
+    <div class="metric-details">
+      <div class="label">Total Activity Logs</div>
+      <div class="value">{{ "{:,}".format(stats.total_logs or 0) }}</div>
+      <div class="subtext">All-time recorded events</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon emerald">⚡</div>
+    <div class="metric-details">
+      <div class="label">Recorded Today</div>
+      <div class="value">{{ "{:,}".format(stats.today_logs or 0) }}</div>
+      <div class="subtext">Actions in the last 24h</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon purple">👑</div>
+    <div class="metric-details">
+      <div class="label">Admin Operations</div>
+      <div class="value">{{ "{:,}".format(stats.admin_logs or 0) }}</div>
+      <div class="subtext">Students, courses, fees & system</div>
+    </div>
+  </div>
+
+  <div class="metric-card">
+    <div class="metric-icon amber">👨‍🏫</div>
+    <div class="metric-details">
+      <div class="label">Teacher Operations</div>
+      <div class="value">{{ "{:,}".format(stats.teacher_logs or 0) }}</div>
+      <div class="subtext">Attendance, batches & rosters</div>
+    </div>
+  </div>
+</div>
+
+<!-- Main Activity Card -->
+<div class="card">
+  <div class="card-header" style="flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;">
+    <div>
+      <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--text-main);">
+        Audit Trail & Operation History
+      </h3>
+      <p style="margin: 3px 0 0 0; font-size: 13px; color: var(--text-muted);">
+        Real-time traceability for all administrative, teaching, and authentication events
+      </p>
+    </div>
+    <div>
+      <a href="{{ url_for('admin.export_activity_logs_csv', role=role_filter, action=action_filter, date=date_filter, search=search_query) }}" 
+         class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 6px;">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Export CSV</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div style="padding: 16px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color);">
+    <form method="GET" action="{{ url_for('admin.activity_logs') }}" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+      
+      <!-- Role Filter -->
+      <div style="min-width: 140px;">
+        <select name="role" class="form-control" style="font-size: 13px; padding: 7px 10px;" onchange="this.form.submit()">
+          <option value="all" {% if role_filter == 'all' or not role_filter %}selected{% endif %}>All Roles</option>
+          <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>👑 Admin Only</option>
+          <option value="teacher" {% if role_filter == 'teacher' %}selected{% endif %}>👨‍🏫 Teacher Only</option>
+        </select>
+      </div>
+
+      <!-- Action Filter -->
+      <div style="min-width: 170px;">
+        <select name="action" class="form-control" style="font-size: 13px; padding: 7px 10px;" onchange="this.form.submit()">
+          <option value="all" {% if action_filter == 'all' or not action_filter %}selected{% endif %}>All Action Types</option>
+          {% for act in distinct_actions %}
+            <option value="{{ act }}" {% if action_filter == act %}selected{% endif %}>{{ act|replace('_', ' ')|title }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Date Filter -->
+      <div style="min-width: 150px;">
+        <input type="date" name="date" class="form-control" style="font-size: 13px; padding: 6px 10px;" 
+               value="{{ date_filter or '' }}" onchange="this.form.submit()" title="Filter by date">
+      </div>
+
+      <!-- Keyword Search -->
+      <div style="flex: 1; min-width: 220px; position: relative;">
+        <input type="text" name="search" class="form-control" placeholder="Search by user, description, or IP..."
+               value="{{ search_query or '' }}" style="font-size: 13px; padding: 7px 12px;">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-sm" style="padding: 7px 16px;">
+        Search
+      </button>
+
+      {% if role_filter != 'all' or action_filter != 'all' or date_filter or search_query %}
+        <a href="{{ url_for('admin.activity_logs') }}" class="btn btn-secondary btn-sm" style="padding: 7px 12px; font-size: 12.5px;">
+          Reset
+        </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <!-- Logs Table -->
+  <div class="table-responsive">
+    <table class="data-table" style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border-color); text-align: left; font-size: 12px; color: var(--text-muted); text-transform: uppercase;">
+          <th style="padding: 12px 18px; width: 170px;">Date & Time</th>
+          <th style="padding: 12px 18px; width: 180px;">User</th>
+          <th style="padding: 12px 18px; width: 170px;">Action</th>
+          <th style="padding: 12px 18px;">Operation Details</th>
+          <th style="padding: 12px 18px; width: 130px; text-align: right;">IP Address</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if logs and logs|length > 0 %}
+          {% for log in logs %}
+            <tr style="border-bottom: 1px solid var(--border-color); font-size: 13.5px; transition: background 0.15s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+              
+              <!-- Date & Time -->
+              <td style="padding: 12px 18px; white-space: nowrap; font-family: monospace; font-size: 12.5px; color: var(--text-muted);">
+                {{ log.created_at.strftime('%d %b %Y, %H:%M:%S') if log.created_at else 'N/A' }}
+              </td>
+
+              <!-- User & Role -->
+              <td style="padding: 12px 18px; white-space: nowrap;">
+                <div style="font-weight: 600; color: var(--text-main);">{{ log.user_name or 'System' }}</div>
+                <div style="margin-top: 2px;">
+                  {% if log.role == 'admin' %}
+                    <span class="badge" style="background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">
+                      👑 ADMIN
+                    </span>
+                  {% elif log.role == 'teacher' %}
+                    <span class="badge" style="background: #ccfbf1; color: #0f766e; border: 1px solid #99f6e4; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; font-weight: 700;">
+                      👨‍🏫 TEACHER
+                    </span>
+                  {% else %}
+                    <span class="badge" style="background: #f1f5f9; color: #475569; font-size: 10.5px; padding: 2px 7px; border-radius: 4px;">
+                      {{ log.role|upper }}
+                    </span>
+                  {% endif %}
+                </div>
+              </td>
+
+              <!-- Action Badge -->
+              <td style="padding: 12px 18px; white-space: nowrap;">
+                {% if 'DELETE' in log.action or 'REMOVE' in log.action %}
+                  <span class="badge" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 700;">
+                    🗑️ {{ log.action|replace('_', ' ')|title }}
+                  </span>
+                {% elif 'FEE' in log.action or 'PAYMENT' in log.action %}
+                  <span class="badge" style="background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 700;">
+                    💰 {{ log.action|replace('_', ' ')|title }}
+                  </span>
+                {% elif 'ATTENDANCE' in log.action %}
+                  <span class="badge" style="background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 700;">
+                    🕒 {{ log.action|replace('_', ' ')|title }}
+                  </span>
+                {% elif 'LOGIN' in log.action or 'LOGOUT' in log.action or 'PASSWORD' in log.action %}
+                  <span class="badge" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 700;">
+                    🔑 {{ log.action|replace('_', ' ')|title }}
+                  </span>
+                {% elif 'CREATE' in log.action or 'ENROLL' in log.action %}
+                  <span class="badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 700;">
+                    ➕ {{ log.action|replace('_', ' ')|title }}
+                  </span>
+                {% else %}
+                  <span class="badge" style="background: #f8fafc; color: #334155; border: 1px solid #e2e8f0; font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 600;">
+                    {{ log.action|replace('_', ' ')|title }}
+                  </span>
+                {% endif %}
+              </td>
+
+              <!-- Details -->
+              <td style="padding: 12px 18px; color: var(--text-main); line-height: 1.45;">
+                {{ log.details }}
+              </td>
+
+              <!-- IP Address -->
+              <td style="padding: 12px 18px; text-align: right; white-space: nowrap; font-family: monospace; font-size: 12px; color: var(--text-muted);">
+                {{ log.ip_address or '—' }}
+              </td>
+
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="5" style="text-align: center; padding: 48px 20px;">
+              <div style="font-size: 36px; margin-bottom: 12px;">📋</div>
+              <h4 style="margin: 0 0 6px 0; color: var(--text-main); font-size: 16px;">No Activity Logs Found</h4>
+              <p style="margin: 0; color: var(--text-muted); font-size: 13.5px;">
+                {% if role_filter != 'all' or action_filter != 'all' or date_filter or search_query %}
+                  No logs match your filter criteria. Try clearing some filters.
+                {% else %}
+                  Activity logs will automatically populate as admins and teachers perform actions.
+                {% endif %}
+              </p>
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination Footer -->
+  {% if total_pages > 1 %}
+    <div style="padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-color); background: #ffffff;">
+      <div style="font-size: 13px; color: var(--text-muted);">
+        Showing page <strong>{{ page }}</strong> of <strong>{{ total_pages }}</strong> ({{ "{:,}".format(total_count) }} total entries)
+      </div>
+      <div style="display: flex; gap: 8px;">
+        {% if page > 1 %}
+          <a href="{{ url_for('admin.activity_logs', page=page-1, role=role_filter, action=action_filter, date=date_filter, search=search_query) }}"
+             class="btn btn-secondary btn-sm">
+            &larr; Previous
+          </a>
+        {% endif %}
+        {% if page < total_pages %}
+          <a href="{{ url_for('admin.activity_logs', page=page+1, role=role_filter, action=action_filter, date=date_filter, search=search_query) }}"
+             class="btn btn-secondary btn-sm">
+            Next &rarr;
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

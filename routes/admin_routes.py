@@ -9,6 +9,7 @@ from utils.fees_db import (
     create_student_fee, record_fee_payment, get_payment_receipt, delete_student_fee
 )
 from utils.attendance_helpers import get_low_attendance_records, get_low_attendance_count
+from utils.audit_logger import log_activity, get_activity_logs, get_activity_stats
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -138,6 +139,7 @@ def add_teacher():
                 INSERT INTO teachers (full_name, email, phone, password, specialization, status)
                 VALUES (%s, %s, %s, %s, %s, 'active')
             """, (full_name, email, phone, hash_password(password), specialization))
+            log_activity("CREATE_TEACHER", f"Created teacher '{full_name}' ({email}, Spec: {specialization or 'None'})")
             flash(f"Teacher '{full_name}' added successfully!", "success")
     except Exception as e:
         flash(f"Database error: {str(e)}", "danger")
@@ -172,6 +174,7 @@ def edit_teacher(teacher_id):
                 SET full_name = %s, email = %s, phone = %s, specialization = %s
                 WHERE teacher_id = %s
             """, (full_name, email, phone, specialization, teacher_id))
+        log_activity("UPDATE_TEACHER", f"Updated teacher ID {teacher_id} '{full_name}' ({email})")
         flash("Teacher details updated.", "success")
     except Exception as e:
         flash(f"Error updating teacher: {str(e)}", "danger")
@@ -192,6 +195,7 @@ def toggle_teacher_status(teacher_id):
     if teacher:
         new_status = "inactive" if teacher["status"] == "active" else "active"
         cursor.execute("UPDATE teachers SET status = %s WHERE teacher_id = %s", (new_status, teacher_id))
+        log_activity("TOGGLE_TEACHER_STATUS", f"Changed status of teacher '{teacher['full_name']}' (ID: {teacher_id}) to '{new_status}'")
         flash(f"Teacher '{teacher['full_name']}' status changed to {new_status.title()}.", "info")
 
     cursor.close()
@@ -210,6 +214,7 @@ def delete_teacher(teacher_id):
             flash("Teacher not found.", "warning")
         else:
             cursor.execute("DELETE FROM teachers WHERE teacher_id = %s", (teacher_id,))
+            log_activity("DELETE_TEACHER", f"Deleted teacher '{teacher['full_name']}' (ID: {teacher_id})")
             flash(f"Teacher '{teacher['full_name']}' has been deleted successfully.", "success")
     except Exception as e:
         flash(f"Error deleting teacher: {str(e)}", "danger")
@@ -256,6 +261,7 @@ def add_course():
             INSERT INTO courses (course_name, description, duration)
             VALUES (%s, %s, %s)
         """, (course_name, description, duration))
+        log_activity("CREATE_COURSE", f"Created course '{course_name}' (Duration: {duration or 'N/A'})")
         flash(f"Course '{course_name}' created successfully!", "success")
     except Exception as e:
         flash(f"Error creating course: {str(e)}", "danger")
@@ -280,6 +286,7 @@ def edit_course(course_id):
             SET course_name = %s, description = %s, duration = %s
             WHERE course_id = %s
         """, (course_name, description, duration, course_id))
+        log_activity("UPDATE_COURSE", f"Updated course ID {course_id} '{course_name}'")
         flash("Course updated successfully.", "success")
     except Exception as e:
         flash(f"Error updating course: {str(e)}", "danger")
@@ -296,6 +303,7 @@ def delete_course(course_id):
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM courses WHERE course_id = %s", (course_id,))
+        log_activity("DELETE_COURSE", f"Deleted course ID {course_id}")
         flash("Course deleted successfully.", "info")
     except Exception as e:
         flash(f"Could not delete course: {str(e)}", "danger")
@@ -359,6 +367,7 @@ def add_batch():
             INSERT INTO batches (batch_name, course_id, teacher_id, start_date, end_date, start_time, end_time, status)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (batch_name, course_id, teacher_id, start_date, end_date, start_time, end_time, status))
+        log_activity("CREATE_BATCH", f"Created batch '{batch_name}' (Status: {status})")
         flash(f"Batch '{batch_name}' created successfully!", "success")
     except Exception as e:
         flash(f"Error creating batch: {str(e)}", "danger")
@@ -389,6 +398,7 @@ def edit_batch(batch_id):
                 start_date = %s, end_date = %s, start_time = %s, end_time = %s, status = %s
             WHERE batch_id = %s
         """, (batch_name, course_id, teacher_id, start_date, end_date, start_time, end_time, status, batch_id))
+        log_activity("UPDATE_BATCH", f"Updated batch ID {batch_id} '{batch_name}' (Status: {status})")
         flash("Batch updated successfully.", "success")
     except Exception as e:
         flash(f"Error updating batch: {str(e)}", "danger")
@@ -405,6 +415,7 @@ def delete_batch(batch_id):
     cursor = conn.cursor()
     try:
         cursor.execute("DELETE FROM batches WHERE batch_id = %s", (batch_id,))
+        log_activity("DELETE_BATCH", f"Deleted batch ID {batch_id}")
         flash("Batch deleted successfully.", "info")
     except Exception as e:
         flash(f"Could not delete batch: {str(e)}", "danger")
@@ -644,6 +655,7 @@ def add_student():
                     VALUES (%s, %s, 'active')
                 """, (batch_id, new_student_id))
 
+            log_activity("CREATE_STUDENT", f"Enrolled student '{full_name}' ({email}, Enroll: {enrollment_number})")
             flash(f"Student '{full_name}' added successfully with Enrollment No: {enrollment_number}!", "success")
     except Exception as e:
         flash(f"Error adding student: {str(e)}", "danger")
@@ -678,6 +690,7 @@ def edit_student(student_id):
                 SET full_name = %s, email = %s, phone = %s, enrollment_number = %s, status = %s
                 WHERE student_id = %s
             """, (full_name, email, phone, enrollment_number or None, status, student_id))
+        log_activity("UPDATE_STUDENT", f"Updated student ID {student_id} '{full_name}' (Status: {status})")
         flash("Student details updated successfully.", "success")
     except Exception as e:
         flash(f"Error updating student: {str(e)}", "danger")
@@ -699,6 +712,7 @@ def delete_student(student_id):
             flash("Student not found.", "warning")
         else:
             cursor.execute("DELETE FROM students WHERE student_id = %s", (student_id,))
+            log_activity("DELETE_STUDENT", f"Deleted student '{student['full_name']}' (ID: {student_id})")
             flash(f"Student '{student['full_name']}' has been deleted successfully.", "success")
     except Exception as e:
         flash(f"Error deleting student: {str(e)}", "danger")
@@ -1139,6 +1153,8 @@ def delete_attendance_session(session_id):
     cursor.close()
     conn.close()
 
+    log_activity("DELETE_ATTENDANCE_SESSION", f"Deleted attendance session ID {session_id} ({date_str})")
+
     flash(f"Attendance session ({date_str}) deleted successfully.", "info")
     return redirect(request.form.get("next") or request.referrer or url_for("admin.reports"))
 
@@ -1241,8 +1257,10 @@ def assign_fee():
                 remarks="Initial down-payment recorded at fee assignment",
                 recorded_by=session.get("user_name", "Admin")
             )
+            log_activity("ASSIGN_FEE", f"Assigned fee ₹{total_amount:,.2f} ('{title}') with down-payment ₹{initial_payment:,.2f} to student ID {student_id}")
             flash("Fee assigned and initial payment recorded successfully!", "success")
         else:
+            log_activity("ASSIGN_FEE", f"Assigned fee ₹{total_amount:,.2f} ('{title}') to student ID {student_id}")
             flash("Fee assigned successfully!", "success")
 
         return redirect(url_for("admin.fee_details", fee_id=fee_id))
@@ -1293,6 +1311,7 @@ def add_fee_payment(fee_id):
         )
 
         flash(f"Payment of ₹{float(res['amount_paid']):,.2f} recorded! Receipt: {res['receipt_number']}. Remaining: ₹{float(res['remaining_fee']):,.2f}", "success")
+        log_activity("RECORD_FEE_PAYMENT", f"Recorded payment of ₹{float(res['amount_paid']):,.2f} for Fee ID {fee_id} (Receipt: {res['receipt_number']})")
         return redirect(url_for("admin.fee_details", fee_id=fee_id))
 
     except Exception as e:
@@ -1316,9 +1335,87 @@ def view_receipt(receipt_number):
 def delete_fee(fee_id):
     try:
         delete_student_fee(fee_id)
+        log_activity("DELETE_FEE", f"Deleted fee record ID {fee_id} and associated payment history")
         flash("Fee record and payment history deleted successfully.", "info")
     except Exception as e:
         flash(f"Failed to delete fee: {str(e)}", "danger")
 
     return redirect(url_for("admin.fees"))
+
+# ==================== ACTIVITY & AUDIT LOGS ====================
+
+@admin_bp.route("/activity-logs")
+@admin_required
+def activity_logs():
+    role_filter = request.args.get("role", "all").strip().lower()
+    action_filter = request.args.get("action", "all").strip()
+    date_filter = request.args.get("date", "").strip()
+    search_query = request.args.get("search", "").strip()
+    page = request.args.get("page", 1, type=int)
+    limit = 50
+    offset = (page - 1) * limit
+
+    logs, total_count = get_activity_logs(
+        role_filter=role_filter,
+        action_filter=action_filter,
+        search_query=search_query,
+        date_filter=date_filter or None,
+        limit=limit,
+        offset=offset
+    )
+    stats, distinct_actions = get_activity_stats()
+    total_pages = max(1, (total_count + limit - 1) // limit)
+
+    return render_template("admin/activity_logs.html",
+                           logs=logs,
+                           stats=stats,
+                           distinct_actions=distinct_actions,
+                           role_filter=role_filter,
+                           action_filter=action_filter,
+                           date_filter=date_filter,
+                           search_query=search_query,
+                           page=page,
+                           total_pages=total_pages,
+                           total_count=total_count)
+
+@admin_bp.route("/activity-logs/export-csv")
+@admin_required
+def export_activity_logs_csv():
+    role_filter = request.args.get("role", "all").strip().lower()
+    action_filter = request.args.get("action", "all").strip()
+    date_filter = request.args.get("date", "").strip()
+    search_query = request.args.get("search", "").strip()
+
+    logs, _ = get_activity_logs(
+        role_filter=role_filter,
+        action_filter=action_filter,
+        search_query=search_query,
+        date_filter=date_filter or None,
+        limit=2000,
+        offset=0
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Log ID", "Date & Time", "Role", "User Name", "User ID", "Action", "Description / Details", "IP Address"])
+
+    for l in logs:
+        created_str = l["created_at"].strftime("%Y-%m-%d %H:%M:%S") if l["created_at"] else ""
+        writer.writerow([
+            l["log_id"],
+            created_str,
+            (l["role"] or "").title(),
+            l["user_name"] or "",
+            l["user_id"] or "",
+            l["action"] or "",
+            l["details"] or "",
+            l["ip_address"] or ""
+        ])
+
+    filename = f"activity_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 

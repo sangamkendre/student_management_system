@@ -103,6 +103,15 @@
           <span>Low Attendance (< 75%)</span>
         </a>
 
+        <div class="menu-category">System</div>
+        <a href="{{ url_for('admin.activity_logs') }}"
+          class="nav-link {% if 'activity_logs' in request.endpoint %}active{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+          </svg>
+          <span>Activity Logs</span>
+        </a>
+
         {% elif user_role == 'teacher' %}
         <div class="menu-category">Instructor Menu</div>
         <a href="{{ url_for('teacher.dashboard') }}"

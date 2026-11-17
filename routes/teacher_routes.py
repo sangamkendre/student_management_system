@@ -8,6 +8,7 @@ from utils.db import get_db_connection
 from utils.auth_helpers import teacher_required, hash_password, generate_next_enrollment_number, verify_password
 from utils.qr_generator import generate_qr_base64
 from utils.attendance_helpers import get_low_attendance_records, get_low_attendance_count
+from utils.audit_logger import log_activity
 
 teacher_bp = Blueprint("teacher", __name__, url_prefix="/teacher")
 
@@ -444,6 +445,7 @@ def add_student_to_batch(batch_id):
                 VALUES (%s, %s, 'active')
                 ON DUPLICATE KEY UPDATE status = 'active'
             """, (batch_id, student_id))
+            log_activity("ENROLL_STUDENT", f"Enrolled student '{full_name}' (ID: {student_id}, Enroll: {enrollment_number}) into Batch ID {batch_id}")
             flash(f"Student '{full_name}' registered with Enrollment No: {enrollment_number} and enrolled in batch!", "success")
         except Exception as e:
             flash(f"Error registering student: {str(e)}", "danger")
@@ -470,6 +472,7 @@ def remove_student_from_batch(batch_id, student_id):
     cursor.close()
     conn.close()
 
+    log_activity("REMOVE_STUDENT_FROM_BATCH", f"Removed student ID {student_id} from Batch ID {batch_id}")
     flash("Student removed from batch.", "info")
     return redirect(url_for("teacher.batch_students", batch_id=batch_id))
 
@@ -608,6 +611,7 @@ def start_attendance(batch_id):
             """, (now, expires_at, qr_token, latest_today["session_id"]))
             cursor.close()
             conn.close()
+            log_activity("START_ATTENDANCE_SESSION", f"Reopened attendance session ID {latest_today['session_id']} for batch '{batch['batch_name']}'")
             if latest_today["attendee_count"] > 0:
                 flash(f"Reopened today's attendance session ({latest_today['attendee_count']} attendees already marked). Timer extended by {duration_mins} mins.", "success")
             else:
@@ -635,6 +639,7 @@ def start_attendance(batch_id):
     cursor.close()
     conn.close()
 
+    log_activity("START_ATTENDANCE_SESSION", f"Started attendance session ID {session_id} for batch '{batch['batch_name']}' ({duration_mins} mins)")
     flash(f"New attendance session started for {batch['batch_name']}! Display the QR code below.", "success")
     return redirect(url_for("teacher.session_view", session_id=session_id))
 
@@ -705,6 +710,7 @@ def close_session(session_id):
     cursor.close()
     conn.close()
 
+    log_activity("CLOSE_ATTENDANCE_SESSION", f"Closed attendance session ID {session_id}")
     flash("Attendance session closed.", "info")
     if sess:
         return redirect(url_for("teacher.batch_reports", batch_id=sess["batch_id"]))
@@ -812,9 +818,11 @@ def manual_mark(session_id):
             VALUES (%s, %s, 'present', NOW())
             ON DUPLICATE KEY UPDATE status = 'present', marked_at = NOW()
         """, (session_id, student_id))
+        log_activity("MANUAL_ATTENDANCE_MARK", f"Manually marked Student ID {student_id} as 'present' in Session ID {session_id}")
         flash("Student marked Present manually.", "success")
     elif action == "remove":
         cursor.execute("DELETE FROM attendance WHERE session_id = %s AND student_id = %s", (session_id, student_id))
+        log_activity("MANUAL_ATTENDANCE_REMOVE", f"Removed attendance record for Student ID {student_id} in Session ID {session_id}")
         flash("Attendance record removed for student.", "info")
 
     cursor.close()
@@ -1204,6 +1212,8 @@ def api_toggle_attendance():
 
     cursor.close()
     conn.close()
+
+    log_activity("TOGGLE_ATTENDANCE", f"Toggled attendance for Student ID {student_id} to '{target_status}' in Session ID {session_id}")
 
     return jsonify({
         "success": True,

@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, sessio
 from utils.db import get_db_connection
 from utils.auth_helpers import verify_password, hash_password
 from utils.email_service import send_password_reset_email, send_password_reset_otp
+from utils.audit_logger import log_activity
 
 auth = Blueprint("auth", __name__)
 
@@ -70,6 +71,14 @@ def login():
             session["user_name"] = matched_user["full_name"]
             session["email"] = matched_user["email"]
 
+            log_activity(
+                action="LOGIN",
+                details=f"User signed in ({user_role.title()}: {matched_user['email']})",
+                user_id=matched_user["id"],
+                role=user_role,
+                user_name=matched_user["full_name"]
+            )
+
             flash(f"Welcome back, {matched_user['full_name']}!", "success")
 
             next_url = request.args.get("next")
@@ -100,6 +109,17 @@ def login():
 
 @auth.route("/logout")
 def logout():
+    user_name = session.get("user_name", "User")
+    role = session.get("role", "system")
+    user_id = session.get("user_id")
+    if user_id:
+        log_activity(
+            action="LOGOUT",
+            details=f"User signed out ({role.title()}: {user_name})",
+            user_id=user_id,
+            role=role,
+            user_name=user_name
+        )
     session.clear()
     flash("You have been signed out successfully.", "info")
     return redirect(url_for("auth.login"))
@@ -346,6 +366,14 @@ def verify_otp():
 
         cursor.close()
         conn.close()
+
+        log_activity(
+            action="PASSWORD_RESET",
+            details=f"Password reset successfully via OTP verification for {email} ({role.title()})",
+            user_id=reset_entry.get("reset_id", 0),
+            role=role,
+            user_name=user_name
+        )
 
         session.pop("reset_token", None)
         session.pop("reset_email", None)
