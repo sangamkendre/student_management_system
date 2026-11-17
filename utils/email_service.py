@@ -9,13 +9,13 @@ logger = logging.getLogger(__name__)
 
 def send_password_reset_otp(to_email: str, user_name: str, role: str, otp: str, reset_url: str = None) -> dict:
     """
-    Sends a 6-digit password reset OTP email to a user (admin, teacher, or student)
-    via SMTP.
+    Sends a 6-digit password reset OTP email to a user (admin, teacher, or student).
+    Supports Brevo HTTPS REST API (ports 443) as well as SMTP (ports 2525 / 587).
     
     Returns a dictionary:
       {
-        "sent": bool,           # True if delivered via SMTP
-        "error": str or None    # Error message if SMTP delivery failed
+        "sent": bool,           # True if delivered via SMTP or API
+        "error": str or None    # Error message if delivery failed
       }
     """
     # Ensure latest environment variables are loaded using absolute path
@@ -27,7 +27,7 @@ def send_password_reset_otp(to_email: str, user_name: str, role: str, otp: str, 
     subject = f"EduManage - Password Reset OTP: {otp}"
 
     mail_server = os.getenv("MAIL_SERVER") or Config.MAIL_SERVER or "smtp-relay.brevo.com"
-    mail_port = int(os.getenv("MAIL_PORT") or Config.MAIL_PORT or 587)
+    mail_port = int(os.getenv("MAIL_PORT") or Config.MAIL_PORT or 2525)
     mail_use_tls = str(os.getenv("MAIL_USE_TLS", Config.MAIL_USE_TLS)).lower() in ("true", "1", "yes")
     mail_username = os.getenv("MAIL_USERNAME") or Config.MAIL_USERNAME or ""
     mail_password = os.getenv("MAIL_PASSWORD") or Config.MAIL_PASSWORD or ""
@@ -124,6 +124,43 @@ EduManage Administration Team
 </html>
 """
 
+    # 1. Option A: Check if a Brevo API Key is configured (via BREVO_API_KEY or xkeysib- key)
+    brevo_api_key = os.getenv("BREVO_API_KEY")
+    if not brevo_api_key and mail_password and mail_password.startswith("xkeysib-"):
+        brevo_api_key = mail_password
+
+    if brevo_api_key:
+        try:
+            import json
+            import urllib.request
+            api_url = "https://api.brevo.com/v3/smtp/email"
+            clean_email = mail_sender
+            clean_name = "EduManage Portal"
+            if "<" in mail_sender and ">" in mail_sender:
+                clean_name = mail_sender.split("<")[0].strip() or "EduManage Portal"
+                clean_email = mail_sender.split("<")[1].split(">")[0].strip()
+
+            api_payload = {
+                "sender": {"name": clean_name, "email": clean_email},
+                "to": [{"email": to_email, "name": user_name}],
+                "subject": subject,
+                "htmlContent": html_body,
+                "textContent": text_body
+            }
+            api_headers = {
+                "accept": "application/json",
+                "content-type": "application/json",
+                "api-key": brevo_api_key
+            }
+            req = urllib.request.Request(api_url, data=json.dumps(api_payload).encode("utf-8"), headers=api_headers)
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                if resp.status in (200, 201, 202):
+                    logger.info(f"Password reset OTP sent to {to_email} via Brevo REST API.")
+                    return {"sent": True, "error": None}
+        except Exception as e:
+            logger.warning(f"Brevo REST API sending failed: {e}. Falling back to SMTP.")
+
+    # 2. Option B: SMTP delivery
     if not mail_username or not mail_password:
         logger.error("SMTP credentials (MAIL_USERNAME / MAIL_PASSWORD) are not set in .env")
         return {
@@ -131,32 +168,41 @@ EduManage Administration Team
             "error": "SMTP credentials (MAIL_USERNAME / MAIL_PASSWORD) are missing in .env."
         }
 
-    try:
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = sender
-        msg["To"] = to_email
-        msg.set_content(text_body)
-        msg.add_alternative(html_body, subtype="html")
+    # Determine ports to try (port 2525 bypasses cloud firewall blocks on 587)
+    ports_to_try = [mail_port]
+    if 2525 not in ports_to_try:
+        ports_to_try.append(2525)
 
-        server = smtplib.SMTP(mail_server, mail_port, timeout=12)
-        if mail_use_tls:
-            server.starttls()
-        server.login(mail_username, mail_password)
-        server.send_message(msg)
-        server.quit()
+    last_error = None
+    for port in ports_to_try:
+        try:
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = to_email
+            msg.set_content(text_body)
+            msg.add_alternative(html_body, subtype="html")
 
-        logger.info(f"Password reset OTP sent to {to_email} via SMTP ({mail_server}).")
-        return {
-            "sent": True,
-            "error": None
-        }
-    except Exception as e:
-        logger.error(f"SMTP delivery failed to {to_email}: {e}")
-        return {
-            "sent": False,
-            "error": str(e)
-        }
+            server = smtplib.SMTP(mail_server, port, timeout=10)
+            if mail_use_tls:
+                server.starttls()
+            server.login(mail_username, mail_password)
+            server.send_message(msg)
+            server.quit()
+
+            logger.info(f"Password reset OTP sent to {to_email} via SMTP ({mail_server}:{port}).")
+            return {
+                "sent": True,
+                "error": None
+            }
+        except Exception as e:
+            last_error = e
+            logger.warning(f"SMTP delivery failed on port {port}: {e}")
+
+    return {
+        "sent": False,
+        "error": str(last_error) if last_error else "Failed to connect to SMTP server."
+    }
 
 def send_password_reset_email(to_email: str, user_name: str, role: str, reset_token: str, host_url: str) -> dict:
     """
