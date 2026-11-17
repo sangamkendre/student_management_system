@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from utils.db import get_db_connection
 from utils.auth_helpers import verify_password, hash_password
-from utils.email_service import send_password_reset_email
+from utils.email_service import send_password_reset_email, send_password_reset_otp
 
 auth = Blueprint("auth", __name__)
 
@@ -107,13 +107,14 @@ def logout():
 # ==================== FORGOT & RESET PASSWORD ====================
 
 def _ensure_password_resets_table(cursor):
-    """Ensure password_resets table exists in the database."""
+    """Ensure password_resets table exists in the database with otp column."""
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS password_resets (
             reset_id INT AUTO_INCREMENT PRIMARY KEY,
             email VARCHAR(255) NOT NULL,
             role ENUM('admin', 'teacher', 'student') NOT NULL,
             token VARCHAR(255) NOT NULL UNIQUE,
+            otp VARCHAR(10) NULL,
             expires_at DATETIME NOT NULL,
             used TINYINT(1) DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -121,6 +122,11 @@ def _ensure_password_resets_table(cursor):
             INDEX idx_email_role (email, role)
         )
     """)
+    # Ensure otp column exists if the table was created before
+    try:
+        cursor.execute("ALTER TABLE password_resets ADD COLUMN otp VARCHAR(10) NULL AFTER token")
+    except Exception:
+        pass
 
 @auth.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
@@ -187,42 +193,54 @@ def forgot_password():
             WHERE LOWER(email) = LOWER(%s) AND role = %s AND used = 0
         """, (email, user_role))
 
-        # Generate fresh secure token (30-minute validity)
+        # Generate fresh 6-digit numeric OTP and secure session token (10-minute validity)
+        otp = f"{secrets.randbelow(900000) + 100000}"
         reset_token = secrets.token_urlsafe(32)
-        expires_at = datetime.now() + timedelta(minutes=30)
+        expires_at = datetime.now() + timedelta(minutes=10)
 
         cursor.execute("""
-            INSERT INTO password_resets (email, role, token, expires_at, used)
-            VALUES (%s, %s, %s, %s, 0)
-        """, (email, user_role, reset_token, expires_at))
+            INSERT INTO password_resets (email, role, token, otp, expires_at, used)
+            VALUES (%s, %s, %s, %s, %s, 0)
+        """, (email, user_role, reset_token, otp, expires_at))
 
         cursor.close()
         conn.close()
 
-        # Dispatch email
-        email_result = send_password_reset_email(
+        # Dispatch OTP email
+        verify_url = url_for("auth.verify_otp", token=reset_token, _external=True)
+        email_result = send_password_reset_otp(
             to_email=email,
             user_name=matched_user["full_name"],
             role=user_role,
-            reset_token=reset_token,
-            host_url=request.host_url
+            otp=otp,
+            reset_url=verify_url
         )
 
-        return render_template("auth/reset_sent.html",
-                               email=email,
-                               user_name=matched_user["full_name"],
-                               role=user_role,
-                               email_result=email_result)
+        session["reset_token"] = reset_token
+        session["reset_email"] = email
+        session["reset_role"] = user_role
+
+        if email_result.get("simulated"):
+            session["simulated_otp"] = otp
+            flash(f"OTP generated for {email} (Running in development fallback mode).", "info")
+        else:
+            flash(f"A 6-digit OTP verification code has been sent to {email}.", "success")
+
+        return redirect(url_for("auth.verify_otp", token=reset_token))
 
     return render_template("auth/forgot_password.html")
 
-@auth.route("/reset-password/<token>", methods=["GET", "POST"])
-def reset_password(token):
+@auth.route("/verify-otp", methods=["GET", "POST"])
+def verify_otp():
+    token = request.args.get("token") or request.form.get("token") or session.get("reset_token")
+    if not token:
+        flash("No active password reset request found. Please enter your email first.", "warning")
+        return redirect(url_for("auth.forgot_password"))
+
     conn = get_db_connection()
     cursor = conn.cursor()
     _ensure_password_resets_table(cursor)
 
-    # Check token validity
     cursor.execute("""
         SELECT * FROM password_resets 
         WHERE token = %s
@@ -232,23 +250,12 @@ def reset_password(token):
     if not reset_entry:
         cursor.close()
         conn.close()
-        flash("Invalid password reset link. Please request a new link.", "danger")
+        flash("Invalid or expired session. Please request a new OTP.", "danger")
         return redirect(url_for("auth.forgot_password"))
 
-    if reset_entry["used"] == 1:
-        cursor.close()
-        conn.close()
-        flash("This password reset link has already been used. Please request a new one.", "warning")
-        return redirect(url_for("auth.forgot_password"))
-
-    if reset_entry["expires_at"] < datetime.now():
-        cursor.close()
-        conn.close()
-        flash("This password reset link has expired (30-minute limit). Please request a fresh link.", "warning")
-        return redirect(url_for("auth.forgot_password"))
-
-    role = reset_entry["role"]
     email = reset_entry["email"]
+    role = reset_entry["role"]
+    correct_otp = str(reset_entry.get("otp") or "").strip()
 
     # Retrieve user's name
     user_name = "User"
@@ -265,25 +272,75 @@ def reset_password(token):
         u = cursor.fetchone()
         if u: user_name = u["full_name"]
 
+    simulated_otp = session.get("simulated_otp")
+
     if request.method == "POST":
+        submitted_otp = request.form.get("otp", "").strip()
         new_password = request.form.get("password", "").strip()
         confirm_password = request.form.get("confirm_password", "").strip()
 
+        if reset_entry["used"] == 1:
+            cursor.close()
+            conn.close()
+            flash("This OTP has already been used. Please request a new code.", "warning")
+            return redirect(url_for("auth.forgot_password"))
+
+        if reset_entry["expires_at"] < datetime.now():
+            cursor.close()
+            conn.close()
+            flash("This OTP has expired (10-minute limit). Please request a fresh OTP.", "warning")
+            return redirect(url_for("auth.forgot_password"))
+
+        if not submitted_otp or submitted_otp != correct_otp:
+            cursor.close()
+            conn.close()
+            flash("Invalid OTP code. Please enter the correct 6-digit code sent to your email.", "danger")
+            return render_template("auth/verify_otp.html",
+                                   token=token,
+                                   email=email,
+                                   role=role,
+                                   user_name=user_name,
+                                   submitted_otp=submitted_otp,
+                                   simulated_otp=simulated_otp)
+
         if not new_password or not confirm_password:
+            cursor.close()
+            conn.close()
             flash("Please fill in both password fields.", "danger")
-            return render_template("auth/reset_password.html", token=token, email=email, role=role, user_name=user_name)
+            return render_template("auth/verify_otp.html",
+                                   token=token,
+                                   email=email,
+                                   role=role,
+                                   user_name=user_name,
+                                   submitted_otp=submitted_otp,
+                                   simulated_otp=simulated_otp)
 
         if len(new_password) < 6:
+            cursor.close()
+            conn.close()
             flash("Password must be at least 6 characters long.", "warning")
-            return render_template("auth/reset_password.html", token=token, email=email, role=role, user_name=user_name)
+            return render_template("auth/verify_otp.html",
+                                   token=token,
+                                   email=email,
+                                   role=role,
+                                   user_name=user_name,
+                                   submitted_otp=submitted_otp,
+                                   simulated_otp=simulated_otp)
 
         if new_password != confirm_password:
+            cursor.close()
+            conn.close()
             flash("Passwords do not match. Please re-enter them.", "danger")
-            return render_template("auth/reset_password.html", token=token, email=email, role=role, user_name=user_name)
+            return render_template("auth/verify_otp.html",
+                                   token=token,
+                                   email=email,
+                                   role=role,
+                                   user_name=user_name,
+                                   submitted_otp=submitted_otp,
+                                   simulated_otp=simulated_otp)
 
         hashed = hash_password(new_password)
 
-        # Update password in role table
         if role == "admin":
             cursor.execute("UPDATE admins SET password = %s WHERE LOWER(email) = LOWER(%s)", (hashed, email))
         elif role == "teacher":
@@ -291,11 +348,15 @@ def reset_password(token):
         elif role == "student":
             cursor.execute("UPDATE students SET password = %s WHERE LOWER(email) = LOWER(%s)", (hashed, email))
 
-        # Mark token as used
         cursor.execute("UPDATE password_resets SET used = 1 WHERE reset_id = %s", (reset_entry["reset_id"],))
 
         cursor.close()
         conn.close()
+
+        session.pop("reset_token", None)
+        session.pop("reset_email", None)
+        session.pop("reset_role", None)
+        session.pop("simulated_otp", None)
 
         flash(f"Password for {email} ({role.title()}) has been reset successfully! Please log in with your new password.", "success")
         return redirect(url_for("auth.login"))
@@ -303,8 +364,85 @@ def reset_password(token):
     cursor.close()
     conn.close()
 
-    return render_template("auth/reset_password.html",
+    return render_template("auth/verify_otp.html",
                            token=token,
                            email=email,
                            role=role,
-                           user_name=user_name)
+                           user_name=user_name,
+                           simulated_otp=simulated_otp)
+
+@auth.route("/resend-otp", methods=["POST"])
+def resend_otp():
+    token = request.form.get("token") or session.get("reset_token")
+    if not token:
+        flash("No active reset session. Please submit your email again.", "warning")
+        return redirect(url_for("auth.forgot_password"))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    _ensure_password_resets_table(cursor)
+
+    cursor.execute("SELECT * FROM password_resets WHERE token = %s", (token,))
+    entry = cursor.fetchone()
+
+    if not entry:
+        cursor.close()
+        conn.close()
+        flash("Session expired. Please request a new OTP.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+
+    email = entry["email"]
+    role = entry["role"]
+
+    # Mark old token as used
+    cursor.execute("UPDATE password_resets SET used = 1 WHERE reset_id = %s", (entry["reset_id"],))
+
+    # Generate new OTP & token
+    new_otp = f"{secrets.randbelow(900000) + 100000}"
+    new_token = secrets.token_urlsafe(32)
+    new_expiry = datetime.now() + timedelta(minutes=10)
+
+    cursor.execute("""
+        INSERT INTO password_resets (email, role, token, otp, expires_at, used)
+        VALUES (%s, %s, %s, %s, %s, 0)
+    """, (email, role, new_token, new_otp, new_expiry))
+
+    user_name = "User"
+    if role == "admin":
+        cursor.execute("SELECT full_name FROM admins WHERE LOWER(email) = LOWER(%s)", (email,))
+        u = cursor.fetchone()
+        if u: user_name = u["full_name"]
+    elif role == "teacher":
+        cursor.execute("SELECT full_name FROM teachers WHERE LOWER(email) = LOWER(%s)", (email,))
+        u = cursor.fetchone()
+        if u: user_name = u["full_name"]
+    elif role == "student":
+        cursor.execute("SELECT full_name FROM students WHERE LOWER(email) = LOWER(%s)", (email,))
+        u = cursor.fetchone()
+        if u: user_name = u["full_name"]
+
+    cursor.close()
+    conn.close()
+
+    verify_url = url_for("auth.verify_otp", token=new_token, _external=True)
+    email_result = send_password_reset_otp(
+        to_email=email,
+        user_name=user_name,
+        role=role,
+        otp=new_otp,
+        reset_url=verify_url
+    )
+
+    session["reset_token"] = new_token
+    session["reset_email"] = email
+    session["reset_role"] = role
+
+    if email_result.get("simulated"):
+        session["simulated_otp"] = new_otp
+
+    flash("A fresh 6-digit OTP has been sent to your email.", "info")
+    return redirect(url_for("auth.verify_otp", token=new_token))
+
+@auth.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    return redirect(url_for("auth.verify_otp", token=token))
